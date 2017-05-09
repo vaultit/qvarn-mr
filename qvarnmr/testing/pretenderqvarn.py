@@ -403,6 +403,43 @@ RESOURCE_TYPES = {
             },
         ],
     },
+
+    # map/reduce derived resource types
+    'company_reports__map': {
+        'path': '/company_reports__map',
+        'type': 'company_reports__map',
+        'versions': [
+            {
+                'version': 'v1',
+                'prototype': {
+                    'type': '',
+                    'id': '',
+                    'revision': '',
+                    '_mr_key': '',
+                    '_mr_source_id': '',
+                    '_mr_source_type': '',
+                },
+            },
+        ],
+    },
+    'company_reports': {
+        'path': '/company_reports',
+        'type': 'company_report',
+        'versions': [
+            {
+                'version': 'v1',
+                'prototype': {
+                    'type': '',
+                    'id': '',
+                    'revision': '',
+                    '_mr_key': '',
+                    '_mr_value': '',
+                    'org_id': '',
+                    'report_id': '',
+                },
+            },
+        ],
+    },
 }
 
 
