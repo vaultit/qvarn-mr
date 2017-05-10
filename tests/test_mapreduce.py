@@ -4,16 +4,25 @@ from qvarnmr.testing.utils import cleaned
 
 
 def test_mapreduce(qvarn):
-    listener = qvarn.create('orgs/listeners', {
+    orgs_listener = qvarn.create('orgs/listeners', {
+        'notify_of_new': True,
+        'listen_on_all': True,
+    })
+    reports_listener = qvarn.create('reports/listeners', {
         'notify_of_new': True,
         'listen_on_all': True,
     })
 
     listeners = [
-        ('orgs', listener),
+        ('orgs', orgs_listener),
+        ('reports', reports_listener),
     ]
 
     org = qvarn.create('orgs', {'names': ['Orgtra']})
+    reports = [
+        qvarn.create('reports', {'org': org['id'], 'generated_timestamp': '1'}),
+        qvarn.create('reports', {'org': org['id'], 'generated_timestamp': '2'}),
+    ]
 
     process(qvarn, listeners, {
         'company_reports__map': [
@@ -35,7 +44,7 @@ def test_mapreduce(qvarn):
                 'source': 'company_reports__map',
                 'type': 'reduce',
                 'func': join,
-                'args': [ContextVar('qvarn'), ContextVar('resource_type'), {
+                'args': [ContextVar('qvarn'), ContextVar('source_resource_type'), {
                     'org': {
                         'id': 'org_id',
                     },
@@ -48,13 +57,25 @@ def test_mapreduce(qvarn):
     })
 
     mapped = qvarn.get_list('company_reports__map')
-    assert len(mapped) == 1
+    assert len(mapped) == 3
     mapped = qvarn.get_multiple('company_reports__map', mapped)
     assert cleaned(mapped[0]) == {
         'type': 'company_reports__map',
         '_mr_key': org['id'],
         '_mr_source_id': org['id'],
         '_mr_source_type': 'orgs',
+    }
+    assert cleaned(mapped[1]) == {
+        'type': 'company_reports__map',
+        '_mr_key': org['id'],
+        '_mr_source_id': reports[0]['id'],
+        '_mr_source_type': 'reports',
+    }
+    assert cleaned(mapped[2]) == {
+        'type': 'company_reports__map',
+        '_mr_key': org['id'],
+        '_mr_source_id': reports[1]['id'],
+        '_mr_source_type': 'reports',
     }
 
     reduced = qvarn.get_list('company_reports')
@@ -65,5 +86,5 @@ def test_mapreduce(qvarn):
         '_mr_key': org['id'],
         '_mr_value': None,
         'org_id': org['id'],
-        'report_id': None,
+        'report_id': reports[1]['id'],
     }
