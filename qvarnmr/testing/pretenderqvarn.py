@@ -3,6 +3,7 @@ import sqlite3
 import logging
 import json
 import time
+import traceback
 
 import jwt
 import webtest
@@ -487,6 +488,7 @@ class PretenderQvarn:
 
             routes = server._app._prepare_resources()
             server._app.add_routes(routes)
+            server._app._app.catchall = False
 
             def handler(request, context):
                 try:
@@ -501,7 +503,17 @@ class PretenderQvarn:
 
     def qvarn_request_handler(self, resource_type, server, request, context):
         context.status_code = 200
-        app = webtest.TestApp(server._app._app)
+
+        def wrapped_app(environ, start_response):
+            try:
+                return server._app._app(environ, start_response)
+            except Exception:
+                # We want to see all errors coming from Qvarn.
+                # Make sure server._app._app.catchall is set to False.
+                print(traceback.format_exc())
+                raise
+
+        app = webtest.TestApp(wrapped_app)
         req = app.RequestClass.blank(
             request.url,
             method=request.method,
