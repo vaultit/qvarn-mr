@@ -1,30 +1,24 @@
-from collections import defaultdict
+from collections import defaultdict, namedtuple
+
+from qvarnmr.func import run
 
 
-class ContextVar:
-
-    def __init__(self, name):
-        assert name in ('qvarn', 'source_resource_type')
-        self.name = name
-
-
-def get_arg(context, value):
-    if isinstance(value, ContextVar):
-        return context[value.name]
-    else:
-        return value
+Context = namedtuple('Context', [
+    'qvarn',
+    'source_resource_type',
+])
 
 
 def process_map(qvarn, source_resource_type, notification, resource, mappers):
-    context = {
-        'qvarn': qvarn,
-        'source_resource_type': source_resource_type,
-    }
+    context = Context(qvarn, source_resource_type)
     if notification['resource_change'] == 'created':
         for target_resource_type, mapper in mappers:
-            args = [get_arg(context, a) for a in mapper['args']]
-            for key, value in mapper['func'](resource, *args):
-                value = value or {}
+            for key, value in run(mapper['map'], context, resource):
+                if isinstance(value, dict):
+                    value['_mr_value'] = None
+                else:
+                    value = {'_mr_value': value}
+
                 value['_mr_key'] = key
                 value['_mr_source_id'] = resource['id']
                 value['_mr_source_type'] = source_resource_type
@@ -35,17 +29,16 @@ def process_map(qvarn, source_resource_type, notification, resource, mappers):
 
 
 def process_reduce(qvarn, source_resource_type, key, reducers):
-    context = {
-        'qvarn': qvarn,
-        'source_resource_type': source_resource_type,
-    }
+    context = Context(qvarn, source_resource_type)
     for target_resource_type, reducer in reducers:
         # Get all resources by given key
         resources = qvarn.search(source_resource_type, _mr_key=key)
 
+        if 'map' in reducer:
+            resources = run(reducer['map'], context, resources)
+
         # Call reduce function for all resources matching key
-        args = [get_arg(context, a) for a in reducer['args']]
-        value = reducer['func'](resources, *args)
+        value = run(reducer['reduce'], context, resources)
 
         # If reduce function returns non-dict value, store it to _mr_value
         if isinstance(value, dict):

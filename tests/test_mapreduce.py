@@ -1,5 +1,5 @@
-from qvarnmr.func import ref, join
-from qvarnmr.worker import ContextVar, process
+from qvarnmr.func import join, items
+from qvarnmr.worker import process
 from qvarnmr.testing.utils import cleaned
 
 
@@ -16,6 +16,7 @@ def test_mapreduce(pretender, qvarn):
                         'id': '',
                         'revision': '',
                         '_mr_key': '',
+                        '_mr_value': '',
                         '_mr_source_id': '',
                         '_mr_source_type': '',
                     },
@@ -67,29 +68,26 @@ def test_mapreduce(pretender, qvarn):
             {
                 'source': 'orgs',
                 'type': 'map',
-                'func': ref,
-                'args': ['id'],
+                'map': items('id'),
             },
             {
                 'source': 'reports',
                 'type': 'map',
-                'func': ref,
-                'args': ['org'],
+                'map': items('org'),
             },
         ],
         'company_reports': [
             {
                 'source': 'company_reports__map',
                 'type': 'reduce',
-                'func': join,
-                'args': [ContextVar('qvarn'), ContextVar('source_resource_type'), {
+                'reduce': join({
                     'org': {
                         'id': 'org_id',
                     },
                     'report': {
                         'id': 'report_id',
                     },
-                }],
+                }),
             },
         ]
     })
@@ -100,18 +98,21 @@ def test_mapreduce(pretender, qvarn):
     assert cleaned(mapped[0]) == {
         'type': 'company_reports__map',
         '_mr_key': org['id'],
+        '_mr_value': None,
         '_mr_source_id': org['id'],
         '_mr_source_type': 'orgs',
     }
     assert cleaned(mapped[1]) == {
         'type': 'company_reports__map',
         '_mr_key': org['id'],
+        '_mr_value': None,
         '_mr_source_id': reports[0]['id'],
         '_mr_source_type': 'reports',
     }
     assert cleaned(mapped[2]) == {
         'type': 'company_reports__map',
         '_mr_key': org['id'],
+        '_mr_value': None,
         '_mr_source_id': reports[1]['id'],
         '_mr_source_type': 'reports',
     }
@@ -141,6 +142,7 @@ def test_reduce_scalar_value(pretender, qvarn):
                         'type': '',
                         'revision': '',
                         '_mr_key': '',
+                        '_mr_value': '',
                         '_mr_source_id': '',
                         '_mr_source_type': '',
                     },
@@ -186,16 +188,14 @@ def test_reduce_scalar_value(pretender, qvarn):
             {
                 'source': 'reports',
                 'type': 'map',
-                'func': ref,
-                'args': ['org'],
+                'map': items('org'),
             },
         ],
         'reports_counts': [
             {
                 'source': 'reports_counts__map',
                 'type': 'reduce',
-                'func': len,
-                'args': [],
+                'reduce': len,
             },
         ]
     })
