@@ -403,43 +403,6 @@ RESOURCE_TYPES = {
             },
         ],
     },
-
-    # map/reduce derived resource types
-    'company_reports__map': {
-        'path': '/company_reports__map',
-        'type': 'company_reports__map',
-        'versions': [
-            {
-                'version': 'v1',
-                'prototype': {
-                    'type': '',
-                    'id': '',
-                    'revision': '',
-                    '_mr_key': '',
-                    '_mr_source_id': '',
-                    '_mr_source_type': '',
-                },
-            },
-        ],
-    },
-    'company_reports': {
-        'path': '/company_reports',
-        'type': 'company_report',
-        'versions': [
-            {
-                'version': 'v1',
-                'prototype': {
-                    'type': '',
-                    'id': '',
-                    'revision': '',
-                    '_mr_key': '',
-                    '_mr_value': '',
-                    'org_id': '',
-                    'report_id': '',
-                },
-            },
-        ],
-    },
 }
 
 
@@ -496,14 +459,18 @@ class PretenderQvarn:
         })
 
     def init_qvarn_routes(self):
-        from qvarn import ResourceServer, SqliteAdapter, DatabaseConnection, QvarnException
         from qvarn.slog import SlogHandler
 
         # Qvarn's SlogHandler requires logging to be used in a non standard way.
         logger = logging.getLogger()
         logger.handlers = [h for h in logger.handlers if not isinstance(h, SlogHandler)]
 
-        for resource_type, resource_type_spec in RESOURCE_TYPES.items():
+        self.add_resource_types(RESOURCE_TYPES)
+
+    def add_resource_types(self, resource_types):
+        from qvarn import ResourceServer, SqliteAdapter, DatabaseConnection, QvarnException
+
+        for resource_type, resource_type_spec in resource_types.items():
             server = ResourceServer()
             server.set_resource_path(resource_type_spec['path'])
             server.set_resource_type(resource_type_spec['type'])
