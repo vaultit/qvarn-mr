@@ -15,6 +15,7 @@ setup(
         # Test dependencies
         'pytest',
         'pytest-mock',
+        'pytest-cov',
         'requests-mock',
         'webtest',
 
