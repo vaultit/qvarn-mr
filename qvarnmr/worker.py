@@ -23,17 +23,20 @@ def process_map(qvarn, source_resource_type, notification, mappers):
                 value['_mr_key'] = key
                 value['_mr_source_id'] = resource['id']
                 value['_mr_source_type'] = source_resource_type
-                if notification['resource_change'] == 'created':
-                    value = qvarn.create(target_resource_type, value)
+                target_resource = qvarn.search_one(target_resource_type, _mr_source_id=resource['id'], default=None)
+                if target_resource:
+                    value['id'] = target_resource['id']
+                    value['revision'] = target_resource['revision']
+                    value = qvarn.update(target_resource_type, target_resource['id'], value)
                 else:
-                    target_resource = qvarn.search_one(target_resource_type, _mr_source_id=resource['id'], default=None)
-                    if target_resource:
-                        value['id'] = target_resource['id']
-                        value['revision'] = target_resource['revision']
-                        value = qvarn.update(target_resource_type, target_resource['id'], value)
-                    else:
-                        value = qvarn.create(target_resource_type, value)
-                yield target_resource_type, key, value
+                    value = qvarn.create(target_resource_type, value)
+                yield target_resource_type, key
+    elif notification['resource_change'] == 'deleted':
+        for target_resource_type, mapper in mappers:
+            target_resource = qvarn.search_one(target_resource_type, _mr_source_id=notification['resource_id'], default=None)
+            if target_resource:
+                yield target_resource_type, target_resource['_mr_key']
+                qvarn.delete(target_resource_type, target_resource['id'])
     else:
         raise ValueError('Unknown resource change type: %r' % notification['resource_change'])
 
@@ -86,10 +89,12 @@ def process(qvarn, listeners, config):
             notification = qvarn.get(resource_type + '/listeners/' + listener['id'] + '/notifications', notification)
 
             # Process map functions.
-            for target_resource_type, key, value in process_map(qvarn, resource_type, notification, mappers[resource_type]):
-                # Process all touched keys with reduce functions.
-                # That means, there is no need to listen notifications of map
-                # target resource types.
+            keys = set(process_map(qvarn, resource_type, notification, mappers[resource_type]))
+
+            # Process all touched keys with reduce functions.
+            # That means, there is no need to listen notifications of map
+            # target resource types.
+            for target_resource_type, key in keys:
                 process_reduce(qvarn, target_resource_type, key, reducers[target_resource_type])
 
             # Consider this change to be done.

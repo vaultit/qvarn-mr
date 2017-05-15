@@ -8,9 +8,6 @@ class Func:
         self.args = args
         self.kwargs = kwargs
 
-    def __repr__(self):
-        return '%r wrapped by %s' % (self.func, super().__repr__())
-
     def __call__(self, context, value):
         return self.func(context, value, *self.args, **self.kwargs)
 

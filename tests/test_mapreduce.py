@@ -309,3 +309,10 @@ def test_create_update_delete_flow(pretender, qvarn):
     reduced = qvarn.get_list('data_reduced')
     reduced = qvarn.get('data_reduced', reduced[0])
     assert reduced['_mr_value'] == 9 and reduced['_mr_key'] == 1
+
+    # Delete some resources.
+    qvarn.delete('data', resources[2]['id'])
+    process(qvarn, listeners, config)
+    reduced = qvarn.get_list('data_reduced')
+    reduced = qvarn.get('data_reduced', reduced[0])
+    assert reduced['_mr_value'] == 4 and reduced['_mr_key'] == 1
