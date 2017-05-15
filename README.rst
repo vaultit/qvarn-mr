@@ -2,7 +2,7 @@ Experimental Qvarn map/reduce service
 #####################################
 
 The idea is to create a service, that will listen for changes of all resource
-types and then would route all changes throug all registered map/reduce
+types and then would route all changes through all registered map/reduce
 functions and will writes transformed data to other resource types.
 
 This service should allow to join several resources into one and do

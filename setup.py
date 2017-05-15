@@ -28,4 +28,9 @@ setup(
         'uwsgidecorators',
         'qvarn',
     ],
+    entry_points={
+        'console_scripts': [
+            'qvarnmr-resync=qvarnmr.scripts.resync:main',
+        ],
+    },
 )

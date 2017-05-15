@@ -1,9 +1,26 @@
+import copy
 import pytest
 import requests_mock
 
+import qvarnmr.config
 from qvarnmr.testing.pretenderqvarn import PretenderQvarn
 
 QVARN_BASE_URL = 'https://qvarn-example.tld'
+
+CONFIG = {
+    'qvarn': {
+        'verify_requests': 'false',
+        'base_url': 'https://qvarn-example.tld',
+        'client_id': 'test_client_id',
+        'client_secret': 'verysecret',
+        'scope': 'scope1,scope2,scope3',
+        'extended_project_fields': 'true',
+    },
+    'gluu': {
+        'base_url': 'https://gluu-example.tld',
+        'end_session_support': 'false',
+    },
+}
 
 
 @pytest.yield_fixture
@@ -20,3 +37,9 @@ def pretender(request, mock_requests, mocker):
 @pytest.fixture
 def qvarn(pretender):
     return pretender.qvarn
+
+
+@pytest.fixture
+def config():
+    qvarnmr.config.set_config(CONFIG)
+    return qvarnmr.config.get_config()
