@@ -1,3 +1,6 @@
+from functools import wraps
+
+
 class Func:
 
     def __init__(self, func, *args, **kwargs):
@@ -5,12 +8,16 @@ class Func:
         self.args = args
         self.kwargs = kwargs
 
+    def __repr__(self):
+        return '%r wrapped by %s' % (self.func, super().__repr__())
+
     def __call__(self, context, value):
         return self.func(context, value, *self.args, **self.kwargs)
 
 
 def mrfunc():
     def decorator(func):
+        @wraps(func)
         def wrapper(*args, **kwargs):
             return Func(func, *args, **kwargs)
         return wrapper
