@@ -404,6 +404,26 @@ RESOURCE_TYPES = {
             },
         ],
     },
+    'qvarnmr_listeners': {
+        'path': '/qvarnmr_listeners',
+        'type': 'qvarnmr_listener',
+        'versions': [
+            {
+                'version': 'v1',
+                'prototype': {
+                    'id': '',
+                    'type': '',
+                    'revision': '',
+                    # QvarnMR deployed instance name.
+                    'instance': '',
+                    # Resource type to listen for.
+                    'resource_type': '',
+                    # Listener id assigned for the resource type.
+                    'listener_id': '',
+                },
+            },
+        ],
+    },
 }
 
 

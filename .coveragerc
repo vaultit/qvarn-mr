@@ -1,4 +1,5 @@
 [run]
 omit =
     qvarnmr/clients/*
+    qvarnmr/config.py
     qvarnmr/testing/pretenderqvarn.py

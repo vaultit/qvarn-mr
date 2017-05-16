@@ -5,6 +5,7 @@ import pytest
 from qvarnmr.func import join, items, values
 from qvarnmr.processor import process
 from qvarnmr.testing.utils import cleaned
+from qvarnmr.listeners import get_or_create_listeners
 
 
 def test_mapreduce(pretender, qvarn):
@@ -47,27 +48,7 @@ def test_mapreduce(pretender, qvarn):
         },
     })
 
-    orgs_listener = qvarn.create('orgs/listeners', {
-        'notify_of_new': True,
-        'listen_on_all': True,
-    })
-    reports_listener = qvarn.create('reports/listeners', {
-        'notify_of_new': True,
-        'listen_on_all': True,
-    })
-
-    listeners = [
-        ('orgs', orgs_listener),
-        ('reports', reports_listener),
-    ]
-
-    org = qvarn.create('orgs', {'names': ['Orgtra']})
-    reports = [
-        qvarn.create('reports', {'org': org['id'], 'generated_timestamp': '1'}),
-        qvarn.create('reports', {'org': org['id'], 'generated_timestamp': '2'}),
-    ]
-
-    process(qvarn, listeners, {
+    config = {
         'company_reports__map': [
             {
                 'source': 'orgs',
@@ -94,7 +75,17 @@ def test_mapreduce(pretender, qvarn):
                 }),
             },
         ]
-    })
+    }
+
+    listeners = get_or_create_listeners(qvarn, 'test', config)
+
+    org = qvarn.create('orgs', {'names': ['Orgtra']})
+    reports = [
+        qvarn.create('reports', {'org': org['id'], 'generated_timestamp': '1'}),
+        qvarn.create('reports', {'org': org['id'], 'generated_timestamp': '2'}),
+    ]
+
+    process(qvarn, listeners, config)
 
     mapped = qvarn.get_list('company_reports__map')
     assert len(mapped) == 3
@@ -171,23 +162,7 @@ def test_reduce_scalar_value(pretender, qvarn):
         },
     })
 
-    reports_listener = qvarn.create('reports/listeners', {
-        'notify_of_new': True,
-        'listen_on_all': True,
-    })
-
-    listeners = [
-        ('reports', reports_listener),
-    ]
-
-    org = qvarn.create('orgs', {'names': ['Orgtra']})
-    reports = [
-        qvarn.create('reports', {'org': org['id']}),
-        qvarn.create('reports', {'org': org['id']}),
-        qvarn.create('reports', {'org': org['id']}),
-    ]
-
-    process(qvarn, listeners, {
+    config = {
         'reports_counts__map': [
             {
                 'source': 'reports',
@@ -202,7 +177,18 @@ def test_reduce_scalar_value(pretender, qvarn):
                 'reduce': len,
             },
         ]
-    })
+    }
+
+    listeners = get_or_create_listeners(qvarn, 'test', config)
+
+    org = qvarn.create('orgs', {'names': ['Orgtra']})
+    reports = [
+        qvarn.create('reports', {'org': org['id']}),
+        qvarn.create('reports', {'org': org['id']}),
+        qvarn.create('reports', {'org': org['id']}),
+    ]
+
+    process(qvarn, listeners, config)
 
     reduced = qvarn.get_list('reports_counts')
     assert len(reduced) == 1
@@ -268,15 +254,6 @@ def test_create_update_delete_flow(pretender, qvarn):
         },
     })
 
-    reports_listener = qvarn.create('data/listeners', {
-        'notify_of_new': True,
-        'listen_on_all': True,
-    })
-
-    listeners = [
-        ('data', reports_listener),
-    ]
-
     config = {
         'data_mapped': [
             {
@@ -294,6 +271,8 @@ def test_create_update_delete_flow(pretender, qvarn):
             },
         ],
     }
+
+    listeners = get_or_create_listeners(qvarn, 'test', config)
 
     # Create several resources.
     resources = [
@@ -376,15 +355,6 @@ def test_map_handler_error(pretender, qvarn):
         },
     })
 
-    listener = qvarn.create('data/listeners', {
-        'notify_of_new': True,
-        'listen_on_all': True,
-    })
-
-    listeners = [
-        ('data', listener),
-    ]
-
     config = {
         'data_mapped': [
             {
@@ -403,6 +373,8 @@ def test_map_handler_error(pretender, qvarn):
         ],
     }
 
+    listeners = get_or_create_listeners(qvarn, 'test', config)
+
     # Create several resources.
     qvarn.create('data', {'key': 1, 'value': 1}),
     qvarn.create('data', {'key': 1, 'value': 2}),
@@ -414,5 +386,6 @@ def test_map_handler_error(pretender, qvarn):
     assert str(error.value) == "imitated reduce error"
 
     # Since reducer failed, all notifications should be left in queue.
-    notifications = qvarn.get_list('data/listeners/' + listener['id'] + '/notifications')
+    listeners = dict(get_or_create_listeners(qvarn, 'test', config))
+    notifications = qvarn.get_list('data/listeners/' + listeners['data']['id'] + '/notifications')
     assert len(notifications) == 3
