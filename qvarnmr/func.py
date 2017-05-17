@@ -12,7 +12,7 @@ class Func:
         return self.func(context, value, *self.args, **self.kwargs)
 
 
-def mrfunc():
+def mr_func():
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -32,7 +32,7 @@ def count(items):
     return sum(1 for x in items)
 
 
-@mrfunc()
+@mr_func()
 def item(context, resource, key, value=None):
     if value is None:
         yield resource[key], None
@@ -40,12 +40,12 @@ def item(context, resource, key, value=None):
         yield resource[key], resource[value]
 
 
-@mrfunc()
+@mr_func()
 def value(context, resource, key='_mr_value'):
     yield resource[key]
 
 
-@mrfunc()
+@mr_func()
 def join(context, resources, mapping):
     result = {}
     for resource in context.qvarn.get_multiple(context.source_resource_type, resources):

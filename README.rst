@@ -59,7 +59,7 @@ Firs of all, you have to define map/reduce handlers. You can read more about
 how to define map/reduce handlers in the `How to define map/reduce handlers`_
 section. Here is a simple example:
 
-.. code:: python
+.. code-block:: python
 
     from qvarnmr.func import join, item
 
@@ -108,11 +108,12 @@ synchronisation by running this command::
 
 ``qvarnmr-resync`` will create Qvarn notification listeners and will run
 initial map/reduce processing for each source resource type defined in the
-``path.to.handlers`` configuration. If you source resource type have many
-resource, this process can take long time to complete.
+``path.to.handlers`` configuration. If your source resource type have many
+resources, this process can take a long time to complete and currently id does
+not have a progress bar.
 
-``-c path/to/qvarnmr.cfg`` is Python configparser configuration file. Here is
-example file:
+``-c path/to/qvarnmr.cfg`` is a Python configparser configuration file. Here is
+example configuration file:
 
 .. code-block:: ini
 
@@ -135,15 +136,15 @@ be used to know which notification handlers to use. There can be multiple
 qvarnmr instances running, each processing different handlers. In order to
 distinguish between these qvarnmr instances, instance name is used.
 
-Probably it's a good idea to use project's domain name as instance name. But
+Probably it's a good idea to use project domain name as instance name. But
 basically it can be anything, just make sure, that two instances does not have
-same name, because then each will steal notifications from one another.
+the same name, because then each will steal notifications from one another.
 
-Finally, when when initial processing is done, you need to run qvarnmr daemon,
+Finally, when initial processing is done, you need to run qvarnmr daemon,
 to process all changes continuously. You can do that by running following
 command::
 
-  qvarnmr-resync path.to.handlers -c path/to/qvarnmr.cfg -f
+  qvarnmr-worker path.to.handlers -c path/to/qvarnmr.cfg -f
 
 Here ``-f`` stands for *forever*. Other arguments are the same as for
 ``qvarnmr-resync``.
@@ -190,13 +191,13 @@ Let's analyse the following example a bit further:
         ]
     }
 
-Here we have to **source resource types** ``orgs`` and ``reports`` for the
-**map type handler**. Result of these map functions will be written to a new
-derived resource type ``company_reports__map``, we will call these resource
-types as **target resource types**.
+Here we have two **source resource types** ``orgs`` and ``reports`` for the
+**map handler**. Result of these map functions will be written to a new derived
+resource type ``company_reports__map``, we will call these resource types as
+**target resource types**.
 
 Then everything, that goes  into ``company_reports__map`` will be processed by
-the **reduce type handler**, key by key. Result of the reduce function will be
+the **reduce handler**, key by key. Result of the reduce handler will be
 written into ``company_reports`` target resource type.
 
 ``item()`` and ``join()`` are helpers, to build a function for handling common
@@ -217,27 +218,26 @@ Here is example of a map function:
         yield resource['id'], None
 
 Each map function receives single argument, a resource. Each map function
-should be a generator and should yield **key** and **value** tuples.
+should be a generator and should yield (**key**, **value**) tuples.
 
 **Value** can be a ``None``, a scalar value or a dict. If **value** is a dict,
-then it will be interpreted as a target resource type. If **value** is not a
-dict, then it will be stored in ``_mr_value`` field of the target resource
-type.
+then it will be interpreted as a resource. If **value** is not a
+dict, then it will be stored in ``_mr_value`` field in the target resource.
 
 In cases, when you want more control you can decorate you map function with
-``qvarnmr.func.mrfunc`` decorator. For example:
+``qvarnmr.func.mr_func`` decorator. For example:
 
 .. code-block:: python
 
-    from qvarnmr.func import mrfunc
+    from qvarnmr.func import mr_func
 
-    @mrfunc()
+    @mr_func()
     def orgs_users(context, resource):
         for contract in context.qvarn.search('contracts', resource_id=resource['id']):
             person = contract.get_one('contract_parties', role='user')
             yield resource['id'], person['id']
 
-With ``@mrfunc()`` decorator you map function will get ``context`` argument.
+With ``@mr_func()`` decorator you map function will get ``context`` argument.
 Context is a namedtuples and has following fields:
 
 - ``qvarn`` - ``QvarnApi`` instance for accessing Qvarn database.
@@ -273,7 +273,7 @@ If you want to access whole resource, you have to do something like this:
 
 .. code-block:: python
 
-    @mrfunc()
+    @mr_func()
     def count_something_else(context, resources):
         return sum(
             resource['something_else']
