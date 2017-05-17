@@ -14,12 +14,13 @@ CONFIG = {
         'client_id': 'test_client_id',
         'client_secret': 'verysecret',
         'scope': 'scope1,scope2,scope3',
-        'extended_project_fields': 'true',
     },
     'gluu': {
         'base_url': 'https://gluu-example.tld',
-        'end_session_support': 'false',
     },
+    'qvarnmr': {
+        'instance': 'test',
+    }
 }
 
 

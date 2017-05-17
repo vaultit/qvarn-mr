@@ -2,7 +2,7 @@ from unittest import mock
 
 import pytest
 
-from qvarnmr.func import join, items, values
+from qvarnmr.func import join, item, value, count
 from qvarnmr.processor import process
 from qvarnmr.testing.utils import cleaned
 from qvarnmr.listeners import get_or_create_listeners
@@ -53,12 +53,12 @@ def test_mapreduce(pretender, qvarn):
             {
                 'source': 'orgs',
                 'type': 'map',
-                'map': items('id'),
+                'map': item('id'),
             },
             {
                 'source': 'reports',
                 'type': 'map',
-                'map': items('org'),
+                'map': item('org'),
             },
         ],
         'company_reports': [
@@ -167,14 +167,14 @@ def test_reduce_scalar_value(pretender, qvarn):
             {
                 'source': 'reports',
                 'type': 'map',
-                'map': items('org'),
+                'map': item('org'),
             },
         ],
         'reports_counts': [
             {
                 'source': 'reports_counts__map',
                 'type': 'reduce',
-                'reduce': len,
+                'reduce': count,
             },
         ]
     }
@@ -259,14 +259,14 @@ def test_create_update_delete_flow(pretender, qvarn):
             {
                 'source': 'data',
                 'type': 'map',
-                'map': items('key', 'value'),
+                'map': item('key', 'value'),
             },
         ],
         'data_reduced': [
             {
                 'source': 'data_mapped',
                 'type': 'reduce',
-                'map': values(),
+                'map': value(),
                 'reduce': sum,
             },
         ],
@@ -360,7 +360,7 @@ def test_map_handler_error(pretender, qvarn):
             {
                 'source': 'data',
                 'type': 'map',
-                'map': items('key', 'value'),
+                'map': item('key', 'value'),
             },
         ],
         'data_reduced': [

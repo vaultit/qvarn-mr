@@ -28,8 +28,12 @@ def run(func, context, value):
         return func(value)
 
 
+def count(items):
+    return sum(1 for x in items)
+
+
 @mrfunc()
-def items(context, resource, key, value=None):
+def item(context, resource, key, value=None):
     if value is None:
         yield resource[key], None
     else:
@@ -37,9 +41,8 @@ def items(context, resource, key, value=None):
 
 
 @mrfunc()
-def values(context, resources, key='_mr_value'):
-    for resource in context.qvarn.get_multiple(context.source_resource_type, resources):
-        yield resource[key]
+def value(context, resource, key='_mr_value'):
+    yield resource[key]
 
 
 @mrfunc()

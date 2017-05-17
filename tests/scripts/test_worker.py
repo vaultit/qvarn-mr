@@ -1,10 +1,10 @@
-from qvarnmr.scripts import resync
+from qvarnmr.scripts import worker
 from qvarnmr.func import item, value
 
 
 def test_resync(pretender, qvarn, mocker, config):
-    mocker.patch('qvarnmr.scripts.resync.set_config')
-    mocker.patch('qvarnmr.scripts.resync.setup_qvarn_client', return_value=qvarn.client)
+    mocker.patch('qvarnmr.scripts.worker.set_config')
+    mocker.patch('qvarnmr.scripts.worker.setup_qvarn_client', return_value=qvarn.client)
 
     pretender.add_resource_types({
         'data': {
@@ -79,13 +79,16 @@ def test_resync(pretender, qvarn, mocker, config):
 
     mocker.patch('qvarnmr.testing.config', config, create=True)
 
+    # Create notifications.
+    worker.main(['qvarnmr.testing.config', '-c', 'qvarnmr.cfg'])
+
     # Create several resources.
     resources = [
         qvarn.create('data', {'key': 1, 'value': 1}),
         qvarn.create('data', {'key': 1, 'value': 2}),
         qvarn.create('data', {'key': 1, 'value': 3}),
     ]
-    resync.main(['qvarnmr.testing.config', 'data', '-c', 'qvarnmr.cfg'])
+    worker.main(['qvarnmr.testing.config', '-c', 'qvarnmr.cfg'])
     reduced = qvarn.get_list('data_reduced')
     reduced = qvarn.get('data_reduced', reduced[0])
     assert reduced['_mr_value'] == 6 and reduced['_mr_key'] == 1
@@ -93,14 +96,14 @@ def test_resync(pretender, qvarn, mocker, config):
     # Update some resources.
     qvarn.update('data', resources[0]['id'], {'key': 1, 'value': 2})
     qvarn.update('data', resources[2]['id'], {'key': 1, 'value': 5})
-    resync.main(['qvarnmr.testing.config', 'data', '-c', 'qvarnmr.cfg'])
+    worker.main(['qvarnmr.testing.config', '-c', 'qvarnmr.cfg'])
     reduced = qvarn.get_list('data_reduced')
     reduced = qvarn.get('data_reduced', reduced[0])
     assert reduced['_mr_value'] == 9 and reduced['_mr_key'] == 1
 
     # Delete some resources.
     qvarn.delete('data', resources[2]['id'])
-    resync.main(['qvarnmr.testing.config', 'data', '-c', 'qvarnmr.cfg'])
+    worker.main(['qvarnmr.testing.config', '-c', 'qvarnmr.cfg'])
     reduced = qvarn.get_list('data_reduced')
     reduced = qvarn.get('data_reduced', reduced[0])
     assert reduced['_mr_value'] == 4 and reduced['_mr_key'] == 1

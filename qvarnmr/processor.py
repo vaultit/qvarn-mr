@@ -1,6 +1,7 @@
-from collections import namedtuple, defaultdict
+from collections import namedtuple
 
 from qvarnmr.func import run
+from qvarnmr.handlers import get_handlers
 
 
 RESOURCE_CHANGES = CREATED, UPDATED, DELETED = ('created', 'updated', 'deleted')
@@ -49,11 +50,17 @@ def process_map(qvarn, source_resource_type, resource_change, resource_id, mappe
 def process_reduce(qvarn, source_resource_type, key, reducers):
     context = Context(qvarn, source_resource_type)
     for target_resource_type, reducer in reducers:
-        # Get all resources by given key
-        resources = qvarn.search(source_resource_type, _mr_key=key)
+        # Get all resources by given key, force result to be an iterator,
+        # because in future we should query resources iteratively in order to
+        # avoid huge memory consumptions.
+        resources = iter(qvarn.search(source_resource_type, _mr_key=key))
 
         if 'map' in reducer:
-            resources = run(reducer['map'], context, resources)
+            resources = (
+                x
+                for resource in qvarn.get_multiple(source_resource_type, resources)
+                for x in run(reducer['map'], context, resource)
+            )
 
         # Call reduce function for all resources matching key
         value = run(reducer['reduce'], context, resources)
@@ -76,20 +83,6 @@ def process_reduce(qvarn, source_resource_type, key, reducers):
             qvarn.update(target_resource_type, resource['id'], value)
 
 
-def get_handlers(config):
-    mappers = defaultdict(list)
-    reducers = defaultdict(list)
-    for target_resource_type, handlers in config.items():
-        for handler in handlers:
-            if handler['type'] == 'map':
-                mappers[handler['source']].append((target_resource_type, handler))
-            elif handler['type'] == 'reduce':
-                reducers[handler['source']].append((target_resource_type, handler))
-            else:
-                raise ValueError('Unknown map/reduce type, it should be map or reduce, got: %r' % handler['type'])
-    return mappers, reducers
-
-
 def get_changes(qvarn, listeners):
     for resource_type, listener in listeners:
         notifications = qvarn.get_list(resource_type + '/listeners/' + listener['id'] + '/notifications')
@@ -102,13 +95,18 @@ def get_changes(qvarn, listeners):
 
 
 def process_changes(qvarn, changes, mappers, reducers):
+    changes_processed = 0
+
     for resource_type, resource_change, resource_id in changes:
         # Process all changed resources with map handlers.
         keys = set(process_map(qvarn, resource_type, resource_change, resource_id, mappers[resource_type]))
+        changes_processed += len(keys)
 
         # Process all touched keys with reduce handlers.
         for target_resource_type, key in keys:
             process_reduce(qvarn, target_resource_type, key, reducers[target_resource_type])
+
+    return changes_processed
 
 
 def process(qvarn, listeners, config):
