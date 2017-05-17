@@ -220,12 +220,12 @@ Here is example of a map function:
 Each map function receives single argument, a resource. Each map function
 should be a generator and should yield (**key**, **value**) tuples.
 
-**Value** can be a ``None``, a scalar value or a dict. If **value** is a dict,
-then it will be interpreted as a resource. If **value** is not a
-dict, then it will be stored in ``_mr_value`` field in the target resource.
+**value** can be a ``None``, a scalar value or a dict. If **value** is a dict,
+then it will be interpreted as a resource. If **value** is not a dict, then it
+will be stored in the ``_mr_value`` field of the resource.
 
-In cases, when you want more control you can decorate you map function with
-``qvarnmr.func.mr_func`` decorator. For example:
+In cases, when you want to get more control you can decorate your map (or
+reduce) function with ``qvarnmr.func.mr_func`` decorator. For example:
 
 .. code-block:: python
 
@@ -237,8 +237,8 @@ In cases, when you want more control you can decorate you map function with
             person = contract.get_one('contract_parties', role='user')
             yield resource['id'], person['id']
 
-With ``@mr_func()`` decorator you map function will get ``context`` argument.
-Context is a namedtuples and has following fields:
+With ``@mr_func()`` decorator your map function will get ``context`` argument.
+Context is a namedtuple and with following fields:
 
 - ``qvarn`` - ``QvarnApi`` instance for accessing Qvarn database.
 - ``source_resource_type`` - source resource type.
@@ -249,9 +249,9 @@ How to define reduce function
 
 Reduce functions are very similar to the map functions, except reduce will get
 generator of **resource ids** as a first argument. Note, that you will get
-generator of just resource ids, not full resources.
+generator of **resource ids**, not full resources.
 
-For example, in order to get number of resources for each key yielded by map
+For example, in order to get number of resources for each key yielded by a map
 function, you can simply pass ``qvarnmr.func.count`` as reduce function.
 Handler definition will look like this:
 
@@ -260,7 +260,7 @@ Handler definition will look like this:
     from qvarnmr.func import count
 
     {
-        'source': 'map',
+        'source': 'source_resource_type',
         'type': 'reduce',
         'reduce': count,
     },
@@ -269,7 +269,7 @@ We can't use ``len`` here, because first argument is a generator, not a list.
 That's why there is a ``count`` function, that will consume the generator and
 returns number of generated items.
 
-If you want to access whole resource, you have to do something like this:
+If you want to access whole resource by its id, you have to do something like this:
 
 .. code-block:: python
 
@@ -279,6 +279,16 @@ If you want to access whole resource, you have to do something like this:
             resource['something_else']
             for resource in context.qvarn.get_multiple(context.source_resource_type, resources)
         )
+
+And the handler definition would look like this:
+
+.. code-block:: python
+
+    {
+        'source': 'source_resource_type',
+        'type': 'reduce',
+        'reduce': count_something_else(),
+    },
 
 To achieve same thing, you can also use ``map`` function for reduce handler,
 like this:
@@ -325,9 +335,9 @@ Purpose of these fields:
 - ``_mr_value`` - if map functions yields a dict, this will be None, otherwise
   it will contain yielded value.
 - ``_mr_source_id`` - resource id of a source resource type, this is needed to
-  track resource updated and deletes.
+  track resource updates and deletes.
 - ``_mr_source_type`` - source resource type, this is needed to track resource
-  updated and deletes.
+  updates and deletes.
 
 For reduce target resource type, these fields are required:
 
