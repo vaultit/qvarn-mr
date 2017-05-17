@@ -2,15 +2,28 @@ Experimental Qvarn map/reduce service
 #####################################
 
 The idea is to create a service, that will listen for changes on specified
-resource types. All changes will be routed through specified map/reduce. And
-the output will be written to derived resource types.
+resource types. All changes will be routed through defined map/reduce handlers.
+And the output will be written into derived resource types.
 
-This service should allow to join several resources into one and do
-aggregations via reduce functions.
+This service should allow to join several resources into one resource type and
+do aggregations via reduce functions.
 
 You can read more about map/reduce in the Wikipedia_.
 
 .. _Wikipedia: https://en.wikipedia.org/wiki/MapReduce
+
+
+Status
+======
+
+The service is fully implemented and has near 100% test coverage, but is not
+yet used by any real project. So theoretically it should work, but practically
+it was not yet tested. So first integrators should expect rough edged.
+
+The code is very basic and currently does not deal with huge amounts of data.
+It just takes list of all available resource ids and process each id in a
+synchronous way, one by one. This part should be improved, but if list of all
+resource type ids fits into RAM, it should work fine.
 
 
 How to install
@@ -22,6 +35,13 @@ In order to install qvarnmr, create a virtualenv, activate it and run these
 commands::
 
   pip install -f vendor -r requirements.txt -e . 
+
+Yes this is install from source. Currently there is no any python package, nor
+debian package. But python source package should be easily crated by running::
+
+  python setup.py sdist
+
+Then you can put this package to your project and install it from there.
 
 
 How to run tests
@@ -39,7 +59,7 @@ Firs of all, you have to define map/reduce handlers. You can read more about
 how to define map/reduce handlers in the `How to define map/reduce handlers`_
 section. Here is a simple example:
 
-.. code-block:: python
+.. code:: python
 
     from qvarnmr.func import join, item
 
@@ -73,7 +93,7 @@ section. Here is a simple example:
         ]
     }
 
-Handlers should be defined in a importable Python file.
+Handlers should be defined in an importable Python file.
 
 Then you have to define new derived Qvarn resource types. Process how to define
 new resource type is not yet clear, but you can follow `BOL-493`_, to know,
