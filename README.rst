@@ -357,3 +357,147 @@ Purpose of these fields:
   function with same key.
 - ``_mr_value`` - same as with map, if reduce value is not a dict, then value
   will be assigned to this field.
+
+
+Helper functions
+================
+
+count
+-----
+
+Count number of items.
+
+
+item(key, value=None)
+---------------------
+
+Return key and value from a resource, by specified key and value field names.
+
+Example:
+
+.. code-block:: python
+
+  >>> handler = item('foo')
+  >>> next(handler({'foo': 'key', 'bar': 42}))
+  ('key', None)
+
+  >>> handler = item('foo', 'bar')
+  >>> next(handler({'foo': 'key', 'bar': 42}))
+  ('key', 42)
+
+
+value(key='_mr_value')
+----------------------
+
+Return a field value from a resource by specified field name.
+
+Example:
+
+.. code-block:: python
+
+  >>> handler = value()
+  >>> next(handler({'_mr_value': 1, 'foo': 42}))
+  1
+
+  >>> handler = value('foo')
+  >>> next(handler({'_mr_value': 1, 'foo': 42}))
+  42
+
+
+join(mapping)
+-------------
+
+Should by useful for reduce handlers. Accepts a mapping of source resource
+types and field mapping for each resource type. The result is a dict joined
+from list of source resources.
+
+.. code-block:: python
+
+  >>> handler = value({
+  ...     'a': {
+  ...         'id': 'a_id',
+  ...         'foo': None,
+  ...     },
+  ...     'b': {
+  ...         'id': 'b_id',
+  ...         'bar': None,
+  ...     },
+  ... })
+  >>> next(handler([
+  ...     {'type': 'a', 'id': 1, 'foo': 42},
+  ...     {'type': 'b', 'id': 2, 'bar': 24},
+  ])
+  {'a_id': 1, 'b_id': 2, 'foo': 42, 'bar': 24}
+
+This example is not exactly true, because ``handler`` will get generator of map
+target resource type ids, but join handler will fetch resource for each id and
+then for each resource it will fetch source resource and then will do the
+mapping.
+
+For example, if we have following handler configuration:
+
+.. code-block:: python
+
+    from qvarnmr.func import join, item
+
+
+    handlers = {
+        'company_reports__map': [
+            {
+                'source': 'orgs',
+                'type': 'map',
+                'map': item('id'),
+            },
+            {
+                'source': 'reports',
+                'type': 'map',
+                'map': item('org'),
+            },
+        ],
+        'company_reports': [
+            {
+                'source': 'company_reports__map',
+                'type': 'reduce',
+                'reduce': join({
+                    'org': {
+                        'id': 'org_id',
+                    },
+                    'report': {
+                        'id': 'report_id',
+                    },
+                }),
+            },
+        ]
+    }
+
+Then ``company_reports__map`` will have something like this::
+
+    [
+        {
+            'id': 1,
+            'type': 'company_reports__map',
+            '_mr_key': 10,
+            '_mr_value': None,
+            '_mr_source_id': 20,
+            '_mr_source_type': orgs,
+        },
+        {
+            'id': 2,
+            'type': 'company_reports__map',
+            '_mr_key': 10,
+            '_mr_value': None,
+            '_mr_source_id': 30,
+            '_mr_source_type': reports,
+        },
+    ]
+
+Then reduce handler will receive::
+
+    [1, 2]
+
+Then it will fetch ``company_reports__map`` resources by given ids and then for
+each ``company_reports__map`` resource it will fetch ``_mr_source_type`` using
+``_mr_source_id`` and then do then mapping on that.
+
+Reason why it is implemented this way is that you don't have to copy whole
+resource content into the map resource, you just need the key.
