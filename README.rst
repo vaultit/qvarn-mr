@@ -497,7 +497,7 @@ Then reduce handler will receive::
 
 Then it will fetch ``company_reports__map`` resources by given ids and then for
 each ``company_reports__map`` resource it will fetch ``_mr_source_type`` using
-``_mr_source_id`` and then do then mapping on that.
+``_mr_source_id`` and then do the mapping on that.
 
 Reason why it is implemented this way is that you don't have to copy whole
 resource content into the map resource, you just need the key.
