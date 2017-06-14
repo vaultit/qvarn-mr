@@ -13,7 +13,7 @@ pytest-cov==2.5.0
 pytest-mock==1.6.0
 python-dateutil==2.6.0
 PyYAML==3.12
-qvarn==0.80+git
+qvarn==0.82+py3
 qvarn-utils==2.1.1+git20161214.dba11cd
 qvarnmr==0.1
 requests==2.13.0

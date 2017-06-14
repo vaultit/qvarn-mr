@@ -1,9 +1,7 @@
 from setuptools import setup, find_packages
 
-QVARN_VERSION = '0.78'
-
 setup(
-    name='qvarnmr',
+    name='qvarn-mr',
     version='0.1',
     packages=find_packages('.'),
     include_package_data=True,

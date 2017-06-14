@@ -9,6 +9,7 @@ import jwt
 import webtest
 import qvarnclient
 import requests_mock
+import yaml
 
 from qvarnmr.clients.qvarn import QvarnApi, QvarnClient
 
@@ -38,7 +39,7 @@ RESOURCE_TYPES = {
                 'subpaths': {
                     'photo': {
                         'prototype': {
-                            'body': memoryview(b''),
+                            'body': 'blob',
                             'content_type': '',
                         },
                     },
@@ -233,7 +234,7 @@ RESOURCE_TYPES = {
                 'subpaths': {
                     'document': {
                         'prototype': {
-                            'body': memoryview(b''),
+                            'body': 'blob',
                             'content_type': '',
                         },
                     },
@@ -273,7 +274,7 @@ RESOURCE_TYPES = {
                 'subpaths': {
                     'pdf': {
                         'prototype': {
-                            'body': memoryview(b''),
+                            'body': 'blob',
                             'content_type': '',
                         },
                     },
@@ -434,8 +435,9 @@ class PretenderQvarn:
         self.base_url = base_url
         self.db = sqlite3.connect(':memory:', check_same_thread=False)
 
-        self.init_routes()
+        self.resource_type_names = set()
         self.init_qvarn_routes()
+        self.init_routes()
 
         scopes = ['scope1', 'scope2', 'scope3']
         qvarn_requests = qvarnclient.QvarnRequests(self.base_url, 'client_id', 'client_secret',
@@ -486,47 +488,58 @@ class PretenderQvarn:
         logger = logging.getLogger()
         logger.handlers = [h for h in logger.handlers if not isinstance(h, SlogHandler)]
 
+        from qvarn import BackendApplication, SqliteAdapter, DatabaseConnection
+
+        self.qvarnapp = BackendApplication()
+
+        sql = SqliteAdapter()
+        sql._conn = self.db
+        self.qvarnapp._dbconn = DatabaseConnection()
+        self.qvarnapp._dbconn.set_sql(sql)
+
         self.add_resource_types(RESOURCE_TYPES)
 
     def add_resource_types(self, resource_types):
-        from qvarn import ResourceServer, SqliteAdapter, DatabaseConnection, QvarnException
+        from qvarn import QvarnException, add_resource_type_to_server
 
-        for resource_type, resource_type_spec in resource_types.items():
-            server = ResourceServer()
-            server.set_resource_path(resource_type_spec['path'])
-            server.set_resource_type(resource_type_spec['type'])
-            server.add_resource_type_versions(resource_type_spec['versions'])
-            server.create_resource()
+        self.qvarnapp._store_resource_types([
+            (spec, yaml.dump(spec))
+            for spec in resource_types.values()
+            if spec['type'] not in self.resource_type_names
+        ])
+        specs = self.qvarnapp._load_specs_from_db()
 
-            sql = SqliteAdapter()
-            sql._conn = self.db
-            server._app._dbconn = DatabaseConnection()
-            server._app._dbconn.set_sql(sql)
+        for spec in specs:
+            if spec['type'] not in self.resource_type_names:
+                resources = add_resource_type_to_server(self.qvarnapp, spec)
+                self.qvarnapp.add_routes(resources)
 
-            with server._app._dbconn.transaction() as t:
-                server._app._vs.prepare_storage(t)
+        with self.qvarnapp._dbconn.transaction() as t:
+            for vs in self.qvarnapp._vs_list:
+                if vs._resource_type not in self.resource_type_names:
+                    vs.prepare_storage(t)
 
-            routes = server._app._prepare_resources()
-            server._app.add_routes(routes)
-            server._app._app.catchall = False
+        self.resource_type_names.update(spec['type'] for spec in resource_types.values())
 
-            def handler(request, context):
-                try:
-                    return self.qvarn_request_handler(resource_type, server, request, context)
-                except QvarnException as e:
-                    context.status_code = e.status_code
-                    return json.dumps(e.error).encode('utf-8')
+        self.qvarnapp._app.catchall = False
 
-            match = re.compile('^%s%s' % (self.base_url, resource_type_spec['path']))
+        def handler(request, context):
+            try:
+                return self.qvarn_request_handler(request, context)
+            except QvarnException as e:
+                context.status_code = e.status_code
+                return json.dumps(e.error).encode('utf-8')
 
+        for request_type, spec in resource_types.items():
+            match = re.compile('^%s%s' % (self.base_url, spec['path']))
             self.requests.register_uri(requests_mock.ANY, match, content=handler)
 
-    def qvarn_request_handler(self, resource_type, server, request, context):
+    def qvarn_request_handler(self, request, context):
         context.status_code = 200
 
         def wrapped_app(environ, start_response):
             try:
-                return server._app._app(environ, start_response)
+                return self.qvarnapp._app(environ, start_response)
             except Exception:
                 # We want to see all errors coming from Qvarn.
                 # Make sure server._app._app.catchall is set to False.
