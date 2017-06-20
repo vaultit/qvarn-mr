@@ -5,7 +5,7 @@
 
 # Usage ./build-debian-package TARGET_SUITE BUILD_NUMBER
 
-set -euv
+set -euvo pipefail
 
 TARGET_SUITE="$1"
 BUILD_NUMBER="$2"
