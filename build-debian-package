@@ -1,11 +1,8 @@
 #!/bin/bash
 
-# Build dependencies:
-#   sudo apt install build-essential python-all debhelper devscripts
-
 # Usage ./build-debian-package TARGET_SUITE BUILD_NUMBER
 
-set -euv
+set -euvo pipefail
 
 TARGET_SUITE="$1"
 BUILD_NUMBER="$2"
@@ -25,11 +22,10 @@ echo "upstream_version: $upstream_version"
 echo "full_version: $full_version"
 
 # Clean up parent directory
-mkdir -p dist/debian
-rm -f "dist/debian/${srcpkg}"*_*
+rm -f "../${srcpkg}"*_*
 
 # Create upstream tarball
-git archive HEAD | xz -9 > "dist/debian/${srcpkg}_${upstream_version}.orig.tar.xz"
+git archive HEAD | xz -9 > "../${srcpkg}_${upstream_version}.orig.tar.xz"
 
 # Setup changelog
 dch -v "$full_version" -D "$TARGET_SUITE" --force-distribution "New build from commit $commit"
@@ -40,4 +36,5 @@ export VERSION="$upstream_version"
 debuild -e VERSION -us -uc
 
 # Store changes file name
-echo "${srcpkg}_${full_version}_amd64.changes" > dist/debian/changes_file
+echo "${srcpkg}_${full_version}_amd64.changes" > ../changes_file
+
