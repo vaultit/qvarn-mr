@@ -425,6 +425,28 @@ RESOURCE_TYPES = {
             },
         ],
     },
+    'qvarnmr_handlers': {
+        'path': '/qvarnmr_handlers',
+        'type': 'qvarnmr_handler',
+        'versions': [
+            {
+                'version': 'v1',
+                'prototype': {
+                    'id': '',
+                    'type': '',
+                    'revision': '',
+                    # QvarnMR deployed instance name.
+                    'instance': '',
+                    # Source and target resource type names, source and target should be unique.
+                    # One source and one target should be used only by one handler.
+                    'target': '',
+                    'source': '',
+                    # Handler version, is used to check if full resync is needed.
+                    'version': 0,
+                },
+            },
+        ],
+    },
 }
 
 

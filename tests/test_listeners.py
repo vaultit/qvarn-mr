@@ -1,3 +1,5 @@
+from operator import itemgetter
+
 from qvarnmr.listeners import get_or_create_listeners
 
 
@@ -36,13 +38,13 @@ def test_get_listeners(pretender, qvarn):
     })
 
     config = {
-        'data__map': [
-            {'source': 'data1', 'type': 'map'},
-            {'source': 'data2', 'type': 'map'},
-        ],
-        'data__join': [
-            {'source': 'data__map', 'type': 'reduce'},
-        ]
+        'data__map': {
+            'data1': {'type': 'map'},
+            'data2': {'type': 'map'},
+        },
+        'data__join': {
+            'data__map': {'type': 'reduce'},
+        },
     }
 
     data1_listener = qvarn.create('data1/listeners', {
@@ -60,7 +62,7 @@ def test_get_listeners(pretender, qvarn):
     data2_qvarnmr_listener = qvarn.search_one('qvarnmr_listeners', instance='test', resource_type='data2')
     data2_listener = qvarn.get('data2/listeners', data2_qvarnmr_listener['listener_id'])
 
-    assert listeners == [
+    assert sorted(listeners, key=itemgetter(0)) == [
         ('data1', data1_listener),
         ('data2', data2_listener),
     ]

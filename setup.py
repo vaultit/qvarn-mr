@@ -29,7 +29,6 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'qvarnmr-resync=qvarnmr.scripts.resync:main',
             'qvarnmr-worker=qvarnmr.scripts.worker:main',
         ],
     },

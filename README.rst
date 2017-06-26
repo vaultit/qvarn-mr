@@ -17,13 +17,18 @@ Status
 ======
 
 The service is fully implemented and has near 100% test coverage, but is not
-yet used by any real project. So theoretically it should work, but practically
-it was not yet tested. So first integrators should expect rough edged.
+yet used by any real project. So theoretically it should work, but practice it
+was not yet tested. So first integrators should expect rough edged.
 
 The code is very basic and currently does not deal with huge amounts of data.
 It just takes list of all available resource ids and process each id in a
 synchronous way, one by one. This part should be improved, but if list of all
 resource type ids fits into RAM, it should work fine.
+
+Also qvarn-mr takes care of all synchronizations things automatically. That
+means, when you deploy qvarn-mr for the first time, it will do initial
+synchronization automatically, when new map/reduce handlers are added, they
+will be updated automatically.
 
 
 How to install
@@ -57,7 +62,7 @@ How to use qvarnmr
 
 Firs of all, you have to define map/reduce handlers. You can read more about
 how to define map/reduce handlers in the `How to define map/reduce handlers`_
-section. Here is a simple example:
+section. Here is just a simple example:
 
 .. code-block:: python
 
@@ -65,23 +70,23 @@ section. Here is a simple example:
 
 
     handlers = {
-        'company_reports__map': [
-            {
-                'source': 'orgs',
+        'company_reports__map': {
+            'orgs': {
                 'type': 'map',
-                'map': item('id'),
+                'version': 1,
+                'handler': item('id'),
             },
-            {
-                'source': 'reports',
+            'reports': {
                 'type': 'map',
-                'map': item('org'),
+                'version': 1,
+                'handler': item('org'),
             },
-        ],
-        'company_reports': [
-            {
-                'source': 'company_reports__map',
+        },
+        'company_reports': {
+            'company_reports__map': {
                 'type': 'reduce',
-                'reduce': join({
+                'version': 1,
+                'handler': join({
                     'org': {
                         'id': 'org_id',
                     },
@@ -90,30 +95,52 @@ section. Here is a simple example:
                     },
                 }),
             },
-        ]
+        },
     }
 
 Handlers should be defined in an importable Python file.
 
-Then you have to define new derived Qvarn resource types. Process how to define
-new resource type is not yet clear, but you can follow `BOL-493`_, to know,
-when the decision will be made.
+Then you have to define new derived Qvarn resource types in Qvarn resource
+types yaml file. ``qvarn-mr`` also requires two resource tipes to manage
+internal state:
 
-.. _BOL-493: https://jira.tilaajavastuu.fi/browse/BOL-493
+.. code-block:: yaml
 
-Once you have defined handlers and new resource types, you need to do initial
-synchronisation by running this command::
+    path: /qvarnmr_listeners
+    type: qvarnmr_listener
+    versions:
+    - prototype:
+        id: ''
+        type: ''
+        revision: ''
+        instance: ''
+        resource_type: ''
+        listener_id: ''
+      version: v1
 
-  qvarnmr-resync path.to.handlers -c path/to/qvarnmr.cfg
+    path: /qvarnmr_handlers
+    type: qvarnmr_handler
+    versions:
+    - prototype:
+        id: ''
+        type: ''
+        revision: ''
+        instance: ''
+        target: ''
+        source: ''
+        version: 0
+      version: v1
 
-``qvarnmr-resync`` will create Qvarn notification listeners and will run
-initial map/reduce processing for each source resource type defined in the
-``path.to.handlers`` configuration. If your source resource type have many
-resources, this process can take a long time to complete and currently id does
-not have a progress bar.
+Once you have defined handlers and new resource types, you run
+``qvarnmr-worker``::
+
+  qvarnmr-worker path.to.handlers -c path/to/qvarnmr.cfg -f
+
+Here ``path.to.handlers`` is a Python path to your map/reduce handlers
+configuration.
 
 ``-c path/to/qvarnmr.cfg`` is a Python configparser configuration file. Here is
-example configuration file:
+example of configuration file:
 
 .. code-block:: ini
 
@@ -140,14 +167,7 @@ Probably it's a good idea to use project domain name as instance name. But
 basically it can be anything, just make sure, that two instances does not have
 the same name, because then each will steal notifications from one another.
 
-Finally, when initial processing is done, you need to run qvarnmr daemon,
-to process all changes continuously. You can do that by running following
-command::
-
-  qvarnmr-worker path.to.handlers -c path/to/qvarnmr.cfg -f
-
-Here ``-f`` stands for *forever*. Other arguments are the same as for
-``qvarnmr-resync``.
+``-f`` stands for *forever*.
 
 That's it.
 
@@ -163,23 +183,23 @@ Let's analyse the following example a bit further:
 
 
     handlers = {
-        'company_reports__map': [
-            {
-                'source': 'orgs',
+        'company_reports__map': {
+            'orgs': {
                 'type': 'map',
-                'map': item('id'),
+                'version': 1,
+                'handler': item('id'),
             },
-            {
-                'source': 'reports',
+            'reports': {
                 'type': 'map',
-                'map': item('org'),
+                'version': 1,
+                'handler': item('org'),
             },
-        ],
+        },
         'company_reports': [
-            {
-                'source': 'company_reports__map',
+            'company_reports__map': {
                 'type': 'reduce',
-                'reduce': join({
+                'version': 1,
+                'handler': join({
                     'org': {
                         'id': 'org_id',
                     },
@@ -188,7 +208,7 @@ Let's analyse the following example a bit further:
                     },
                 }),
             },
-        ]
+        },
     }
 
 Here we have two **source resource types** ``orgs`` and ``reports`` for the
@@ -215,10 +235,10 @@ Here is example of a map function:
 .. code-block:: python
 
     def my_map_function(resource):
-        yield resource['id'], None
+        return resource['id'], None
 
-Each map function receives single argument, a resource. Each map function
-should be a generator and should yield (**key**, **value**) tuples.
+Each map function receives single argument, a resource. Each map function can
+simple return or yield (**key**, **value**) tuple.
 
 **value** can be a ``None``, a scalar value or a dict. If **value** is a dict,
 then it will be interpreted as a resource. If **value** is not a dict, then it
@@ -260,9 +280,9 @@ Handler definition will look like this:
     from qvarnmr.func import count
 
     {
-        'source': 'source_resource_type',
         'type': 'reduce',
-        'reduce': count,
+        'version': 1,
+        'handler': count,
     },
 
 We can't use ``len`` here, because first argument is a generator, not a list.
@@ -275,19 +295,17 @@ If you want to access whole resource by its id, you have to do something like th
 
     @mr_func()
     def count_something_else(context, resources):
-        return sum(
-            resource['something_else']
-            for resource in context.qvarn.get_multiple(context.source_resource_type, resources)
-        )
+        resources = context.qvarn.get_multiple(context.source_resource_type, resources)
+        return sum(resource['something_else'] for resource in resources)
 
 And the handler definition would look like this:
 
 .. code-block:: python
 
     {
-        'source': 'source_resource_type',
         'type': 'reduce',
-        'reduce': count_something_else(),
+        'version': 1,
+        'handler': count_something_else(),
     },
 
 To achieve same thing, you can also use ``map`` function for reduce handler,
@@ -298,15 +316,27 @@ like this:
     from qvarnmr.func import value
 
     {
-        'source': 'map',
         'type': 'reduce',
+        'version': 1,
+        'handler': sum,
         'map': value('something_else'),
-        'reduce': sum,
     },
 
 Here, first argument for reduce function will be processed with
 ``value('something_else')``, which simply fetches the source resource and
 returns value of ``something_else``.
+
+If you want access source resource used by map function, which in turn is used
+as a source for reduce function, then you can do something like this:
+
+.. code-block:: python
+
+    @mr_func()
+    def count_something_from_map_source(context, resources):
+        resources = context.qvarn.get_multiple(context.source_resource_type, resources)
+        resources = (qvarn.get(x['_mr_source_type'], x['_mr_source_id']) for x in resources)
+        return sum(x['value'] for x in resources)
+
 
 
 How to define derived resource types
@@ -317,46 +347,70 @@ some special fields used by qvarnmr engine.
 
 For map target resource type, these fields are required:
 
-.. code-block:: python
+.. code-block:: yaml
 
-    {
-        'id': '',
-        'type': '',
-        'revision': '',
-        '_mr_key': '',
-        '_mr_value': '',
-        '_mr_source_id': '',
-        '_mr_source_type': '',
-    }
+    path: /derived_map_resources
+    type: derived_map_resource
+    versions:
+    - prototype:
+        id: ''
+        type: ''
+        revision: ''
+        _mr_key: ''
+        _mr_value: ''
+        _mr_source_id: ''
+        _mr_source_type: ''
+        _mr_version: 0
+        _mr_deleted: false
+      version: v1
 
 Purpose of these fields:
 
 - ``_mr_key`` - is a key, yielded by map function.
+
 - ``_mr_value`` - if map functions yields a dict, this will be None, otherwise
   it will contain yielded value.
+
 - ``_mr_source_id`` - resource id of a source resource type, this is needed to
   track resource updates and deletes.
+
 - ``_mr_source_type`` - source resource type, this is needed to track resource
   updates and deletes.
 
+- ``_mr_version`` - handler version used to produce data for this resource.
+  Version is used to do automatic updates if handler version has changed.
+
+- ``_mr_deleted`` - used for internal purposes, to track which resources have
+  to be deleted, once whole update cycle is done. Resources are not deleted
+  immediately in order to be able to recover in case of an error in the middle
+  of map/reduce function execution.
+
 For reduce target resource type, these fields are required:
 
-.. code-block:: python
+.. code-block:: yaml
 
-    {
-        'id': '',
-        'type': '',
-        'revision': '',
-        '_mr_key': '',
-        '_mr_value': '',
-    }
+    path: /derived_reduce_resources
+    type: derived_reduce_resource
+    versions:
+    - prototype:
+        id: ''
+        type: ''
+        revision: ''
+        _mr_key: ''
+        _mr_value: ''
+        _mr_version: 0
+      version: v1
 
 Purpose of these fields:
 
 - ``_mr_key`` - is a key that represents group of values produced by map
   function with same key.
+
 - ``_mr_value`` - same as with map, if reduce value is not a dict, then value
   will be assigned to this field.
+
+- ``_mr_value`` - purpose of this field is exactly the same as for map derived
+  resources.
 
 
 Helper functions
@@ -378,11 +432,11 @@ Example:
 .. code-block:: python
 
   >>> handler = item('foo')
-  >>> next(handler({'foo': 'key', 'bar': 42}))
+  >>> handler({'foo': 'key', 'bar': 42})
   ('key', None)
 
   >>> handler = item('foo', 'bar')
-  >>> next(handler({'foo': 'key', 'bar': 42}))
+  >>> handler({'foo': 'key', 'bar': 42})
   ('key', 42)
 
 
@@ -396,11 +450,11 @@ Example:
 .. code-block:: python
 
   >>> handler = value()
-  >>> next(handler({'_mr_value': 1, 'foo': 42}))
+  >>> handler({'_mr_value': 1, 'foo': 42})
   1
 
   >>> handler = value('foo')
-  >>> next(handler({'_mr_value': 1, 'foo': 42}))
+  >>> handler({'_mr_value': 1, 'foo': 42})
   42
 
 
@@ -423,10 +477,10 @@ from list of source resources.
   ...         'bar': None,
   ...     },
   ... })
-  >>> next(handler([
+  >>> handler([
   ...     {'type': 'a', 'id': 1, 'foo': 42},
   ...     {'type': 'b', 'id': 2, 'bar': 24},
-  ])
+  ... ])
   {'a_id': 1, 'b_id': 2, 'foo': 42, 'bar': 24}
 
 This example is not exactly true, because ``handler`` will get generator of map
@@ -442,22 +496,22 @@ For example, if we have following handler configuration:
 
 
     handlers = {
-        'company_reports__map': [
-            {
-                'source': 'orgs',
+        'company_reports__map': {
+            'orgs': {
                 'type': 'map',
-                'map': item('id'),
+                'version': 1,
+                'handler': item('id'),
             },
-            {
-                'source': 'reports',
+            'reports': {
                 'type': 'map',
-                'map': item('org'),
+                'version': 1,
+                'handler': item('org'),
             },
         ],
         'company_reports': [
-            {
-                'source': 'company_reports__map',
+            'company_reports__map': {
                 'type': 'reduce',
+                'version': 1,
                 'reduce': join({
                     'org': {
                         'id': 'org_id',
@@ -467,7 +521,7 @@ For example, if we have following handler configuration:
                     },
                 }),
             },
-        ]
+        },
     }
 
 Then ``company_reports__map`` will have something like this::
@@ -480,6 +534,8 @@ Then ``company_reports__map`` will have something like this::
             '_mr_value': None,
             '_mr_source_id': 20,
             '_mr_source_type': orgs,
+            '_mr_version': 1,
+            '_mr_deleted': False,
         },
         {
             'id': 2,
@@ -488,6 +544,8 @@ Then ``company_reports__map`` will have something like this::
             '_mr_value': None,
             '_mr_source_id': 30,
             '_mr_source_type': reports,
+            '_mr_version': 1,
+            '_mr_deleted': False,
         },
     ]
 
