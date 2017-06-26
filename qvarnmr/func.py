@@ -1,3 +1,4 @@
+from types import GeneratorType
 from functools import wraps
 
 
@@ -23,9 +24,14 @@ def mr_func():
 
 def run(func, context, value):
     if isinstance(func, Func):
-        return func(context, value)
+        result = func(context, value)
     else:
-        return func(value)
+        result = func(value)
+
+    if isinstance(result, GeneratorType):
+        yield from result
+    else:
+        yield result
 
 
 def count(items):
@@ -35,14 +41,14 @@ def count(items):
 @mr_func()
 def item(context, resource, key, value=None):
     if value is None:
-        yield resource[key], None
+        return resource[key], None
     else:
-        yield resource[key], resource[value]
+        return resource[key], resource[value]
 
 
 @mr_func()
 def value(context, resource, key='_mr_value'):
-    yield resource[key]
+    return resource[key]
 
 
 @mr_func()

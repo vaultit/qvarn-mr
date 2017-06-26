@@ -12,11 +12,13 @@ def get_handlers(config):
     mappers = defaultdict(list)
     reducers = defaultdict(list)
     for target_resource_type, handlers in config.items():
-        for handler in handlers:
+        for source_resource_type, handler in handlers.items():
             if handler['type'] == 'map':
-                mappers[handler['source']].append((target_resource_type, handler))
+                mappers[source_resource_type].append((target_resource_type, handler))
             elif handler['type'] == 'reduce':
-                reducers[handler['source']].append((target_resource_type, handler))
+                reducers[source_resource_type].append((target_resource_type, handler))
             else:
-                raise ValueError('Unknown map/reduce type, it should be map or reduce, got: %r' % handler['type'])
+                raise ValueError((
+                    'Unknown map/reduce type, it should be map or reduce, got: %r'
+                ) % handler['type'])
     return mappers, reducers
