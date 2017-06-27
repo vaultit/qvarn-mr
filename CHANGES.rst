@@ -1,7 +1,11 @@
 Change History
 ==============
 
-0.1.1 (unreleased)
+0.1.2 (unreleased)
+------------------
+
+
+0.1.1 (2017-06-27)
 ------------------
 
 - Reduce handlers now are processed using Qvarn notifications. This should
