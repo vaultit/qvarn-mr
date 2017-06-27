@@ -30,5 +30,14 @@ def get_resource_values(qvarn, target, field):
     result = []
     resources = qvarn.get_list(target)
     for r in qvarn.get_multiple(target, resources):
-        result.append(r[field])
-    return result
+        if isinstance(field, tuple):
+            result.append(tuple(r[x] for x in field))
+        else:
+            result.append(r[field])
+    return sorted(result)
+
+
+def update_resource(qvarn, resource_type, resource_id, **kwargs):
+    resource = qvarn.get(resource_type, resource_id)
+    resource.update(kwargs)
+    qvarn.update(resource_type, resource_id, resource)

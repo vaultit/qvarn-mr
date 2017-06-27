@@ -1,9 +1,9 @@
 from qvarnmr.processor import UPDATED
 from qvarnmr.processor import process_map, process
-from qvarnmr.func import item
+from qvarnmr.func import item, value
 from qvarnmr.handlers import get_handlers
-from qvarnmr.testing.utils import get_mapped_data, get_reduced_data, get_resource_values
 from qvarnmr.listeners import get_or_create_listeners
+from qvarnmr.testing.utils import get_mapped_data, get_resource_values, update_resource
 
 
 SCHEMA = {
@@ -155,3 +155,78 @@ def test_delete_reduce_key_if_source_is_empty(pretender, qvarn):
     process(qvarn, listeners, config)
     assert get_resource_values(qvarn, 'map_target', '_mr_value') == []
     assert get_resource_values(qvarn, 'reduce_target', '_mr_value') == []
+
+
+def test_reduce_half_synced_key(pretender, qvarn):
+    pretender.add_resource_types(SCHEMA)
+
+    config = {
+        'map_target': {
+            'source': {
+                'type': 'map',
+                'version': 1,
+                'handler': item('key', 'value'),
+            },
+        },
+        'reduce_target': {
+            'map_target': {
+                'type': 'reduce',
+                'version': 1,
+                'handler': sum,
+                'map': value(),
+            }
+        }
+    }
+
+    listeners = get_or_create_listeners(qvarn, 'test', config)
+
+    # Add two source values 2 and 3.
+    data = [
+        qvarn.create('source', {'key': '1', 'value': 2}),
+        qvarn.create('source', {'key': '1', 'value': 3}),
+        qvarn.create('source', {'key': '2', 'value': 1}),
+    ]
+
+    # Proces map/reduce handlers.
+    process(qvarn, listeners, config)
+    assert get_resource_values(qvarn, 'map_target', ('_mr_key', '_mr_value', '_mr_version')) == [
+        ('1', 2, 1),
+        ('1', 3, 1),
+        ('2', 1, 1),
+    ]
+    assert get_resource_values(qvarn, 'reduce_target', ('_mr_key', '_mr_value')) == [
+        ('1', 5),
+        ('2', 1),
+    ]
+
+    # Update map handler to a new handler.
+    config['map_target']['source']['version'] = 2
+    config['map_target']['source']['handler'] = lambda r: (r['key'], r['value'] * 2)
+
+    # Update a source resource.
+    # Since not all map_target resources where updated with new handler, reduce processor should
+    # skip all such sources.
+    update_resource(qvarn, 'source', data[1]['id'], value=4)
+    process(qvarn, listeners, config)
+    assert get_resource_values(qvarn, 'map_target', ('_mr_key', '_mr_value', '_mr_version')) == [
+        ('1', 2, 1),
+        ('1', 8, 2),
+        ('2', 1, 1),
+    ]
+    assert get_resource_values(qvarn, 'reduce_target', ('_mr_key', '_mr_value')) == [
+        ('1', 5),
+        ('2', 1),
+    ]
+
+    # Update the other resource.
+    update_resource(qvarn, 'source', data[0]['id'], value=3)
+    process(qvarn, listeners, config)
+    assert get_resource_values(qvarn, 'map_target', ('_mr_key', '_mr_value', '_mr_version')) == [
+        ('1', 6, 2),
+        ('1', 8, 2),
+        ('2', 1, 1),
+    ]
+    assert get_resource_values(qvarn, 'reduce_target', ('_mr_key', '_mr_value')) == [
+        ('1', 14),
+        ('2', 1),
+    ]

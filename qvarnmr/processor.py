@@ -5,6 +5,7 @@ from collections import namedtuple
 from qvarnmr.func import run
 from qvarnmr.handlers import get_handlers
 from qvarnmr.utils import is_empty
+from qvarnmr.exceptions import HandlerVersionError
 
 logger = logging.getLogger(__name__)
 
@@ -122,14 +123,18 @@ def _map_reduce_resources(context, resources, handler):
             yield value
 
 
-def _iter_reduce_resource_ids(qvarn, source_resource_type, key):
-    resources = qvarn.search(source_resource_type, _mr_key=key, show=('_mr_deleted',))
+def _iter_reduce_resource_ids(qvarn, config, source_resource_type, key):
+    resources = qvarn.search(source_resource_type, _mr_key=key,
+                             show=('_mr_source_type', '_mr_version', '_mr_deleted'))
     for resource in resources:
         if not resource['_mr_deleted']:
+            map_handler = config[source_resource_type][resource['_mr_source_type']]
+            if map_handler['version'] != resource['_mr_version']:
+                raise HandlerVersionError(key)
             yield resource['id']
 
 
-def process_reduce(qvarn, source_resource_type, key, handlers, resync=False):
+def process_reduce(qvarn, config, source_resource_type, key, handlers, resync=False):
     context = Context(qvarn, source_resource_type)
     for target_resource_type, handler in handlers:
         target_resource = qvarn.search_one(target_resource_type, _mr_key=key, default=None)
@@ -141,7 +146,7 @@ def process_reduce(qvarn, source_resource_type, key, handlers, resync=False):
         # Get all resources by given key, force result to be an iterator,
         # because in future we should query resources iteratively in order to
         # avoid huge memory consumptions.
-        resources = _iter_reduce_resource_ids(qvarn, source_resource_type, key)
+        resources = _iter_reduce_resource_ids(qvarn, config, source_resource_type, key)
 
         if 'map' in handler:
             resources = _map_reduce_resources(context, resources, handler['map'])
@@ -157,7 +162,7 @@ def process_reduce(qvarn, source_resource_type, key, handlers, resync=False):
         _save_reduce_result(qvarn, handler, target_resource, target_resource_type, key, value)
 
 
-def process_changes(qvarn, changes, mappers, reducers, resync=False):
+def process_changes(qvarn, config, changes, mappers, reducers, resync=False):
     changes_processed = 0
     map_target_resources_types = set()
 
@@ -173,11 +178,19 @@ def process_changes(qvarn, changes, mappers, reducers, resync=False):
 
             # Process all touched keys with reduce handlers.
             for source_resource_type, key in keys:
-                process_reduce(qvarn, source_resource_type, key, reducers[source_resource_type],
-                               resync=False)
+                process_reduce(qvarn, config, source_resource_type, key,
+                               reducers[source_resource_type], resync=False)
 
             # Update set of map target resources types to be cleaned.
             map_target_resources_types.update(resource_type for resource_type, key in keys)
+
+        except HandlerVersionError as e:
+            # We can't process reduce handlers if some source resources have not yet been updated to
+            # newest handler version.
+            if resync:
+                logger.warn("Incompatible handler versions for key=%r, during resync.", e.key)
+            else:
+                logger.debug("Incompatible handler versions for key=%r, updating the key.", e.key)
 
         except Exception:
             logger.exception("Error while processing map/reduce handlers for %r",
@@ -194,7 +207,7 @@ def process_changes(qvarn, changes, mappers, reducers, resync=False):
 def process(qvarn, listeners, config):
     mappers, reducers = get_handlers(config)
     changes = get_changes(qvarn, listeners)
-    process_changes(qvarn, changes, mappers, reducers)
+    process_changes(qvarn, config, changes, mappers, reducers)
 
 
 def get_changes(qvarn, listeners):

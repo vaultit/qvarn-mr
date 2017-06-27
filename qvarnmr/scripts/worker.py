@@ -30,18 +30,13 @@ def main(argv: list=None):
     for _ in resync_changed_handlers(qvarn, handlers, config['qvarnmr']['instance']):
         # We don't want to suspend whole map/reduce engine while full resync is in progress. That is
         # why, we continue to process newest changes, while full resync is in progress.
-        # TODO: we can't process changes in parallel to full resync, because checking for outdated
-        #       map items passed to reduce is not yet implemented.
-        #       Uncomment two lines below and remove `pass` once this is done.
-        #       For now, parallel processing of changes is disabled.
-        # changes = get_changes(qvarn, listeners)
-        # process_changes(qvarn, changes, mappers, reducers)
-        pass
+        changes = get_changes(qvarn, listeners)
+        process_changes(qvarn, config, changes, mappers, reducers)
 
     # Watch notifications and process map/reduce handlers forever.
     while True:
         changes = get_changes(qvarn, listeners)
-        changes_processed = process_changes(qvarn, changes, mappers, reducers)
+        changes_processed = process_changes(qvarn, handlers, changes, mappers, reducers)
 
         if args.forever:
             # If no changes was processed go into sleep mode and wait a few

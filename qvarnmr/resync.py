@@ -67,7 +67,7 @@ def resync_changed_handlers(qvarn: QvarnApi, config: dict, instance: str):
     handlers = iter_changed_handlers(qvarn, config, 'map')
     for target_resource_type, source_resource_type, handler in handlers:
         for changes in chunks(100, iter_map_resync_changes(qvarn, source_resource_type)):
-            process_changes(qvarn, changes, mappers, reducers, resync=True)
+            process_changes(qvarn, config, changes, mappers, reducers, resync=True)
             yield
         # Update handler version only when full resync is successfully done.
         update_handler_version(qvarn, instance, target_resource_type, source_resource_type,
@@ -81,8 +81,8 @@ def resync_changed_handlers(qvarn: QvarnApi, config: dict, instance: str):
     for target_resource_type, source_resource_type, handler in handlers:
         for keys in chunks(100, iter_reduce_resync_keys(qvarn, source_resource_type)):
             for key in keys:
-                process_reduce(qvarn, source_resource_type, key, [(target_resource_type, handler)],
-                               resync=True)
+                process_reduce(qvarn, config, source_resource_type, key,
+                               [(target_resource_type, handler)], resync=True)
         # Update handler version only when full resync is successfully done.
         update_handler_version(qvarn, instance, target_resource_type, source_resource_type,
                                handler['version'])
