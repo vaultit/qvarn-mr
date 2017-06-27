@@ -24,3 +24,11 @@ def get_reduced_data(qvarn, target, expect_n_resources=None):
         assert r['_mr_key'] not in result
         result[r['_mr_key']] = cleaned(r)
     return result
+
+
+def get_resource_values(qvarn, target, field):
+    result = []
+    resources = qvarn.get_list(target)
+    for r in qvarn.get_multiple(target, resources):
+        result.append(r[field])
+    return result

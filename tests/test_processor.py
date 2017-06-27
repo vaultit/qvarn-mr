@@ -2,7 +2,7 @@ from qvarnmr.processor import UPDATED
 from qvarnmr.processor import process_map, process
 from qvarnmr.func import item
 from qvarnmr.handlers import get_handlers
-from qvarnmr.testing.utils import get_mapped_data, get_reduced_data
+from qvarnmr.testing.utils import get_mapped_data, get_reduced_data, get_resource_values
 from qvarnmr.listeners import get_or_create_listeners
 
 
@@ -141,17 +141,17 @@ def test_delete_reduce_key_if_source_is_empty(pretender, qvarn):
 
     # Proces map/reduce and reduce value should be 5 (2 + 3 = 5).
     process(qvarn, listeners, config)
-    reduced = get_reduced_data(qvarn, 'reduce_target', 1)
-    assert reduced[key]['_mr_value'] == 5
+    assert get_resource_values(qvarn, 'map_target', '_mr_value') == [2, 3]
+    assert get_resource_values(qvarn, 'reduce_target', '_mr_value') == [5]
 
     # Remove source resource with value = 2, reduce value should be 3.
     qvarn.delete('source', data[0]['id'])
     process(qvarn, listeners, config)
-    reduced = get_reduced_data(qvarn, 'reduce_target', 1)
-    assert reduced[key]['_mr_value'] == 3
+    assert get_resource_values(qvarn, 'map_target', '_mr_value') == [3]
+    assert get_resource_values(qvarn, 'reduce_target', '_mr_value') == [3]
 
     # Finally remove last source resource, reduce resource should be deleted too.
     qvarn.delete('source', data[1]['id'])
     process(qvarn, listeners, config)
-    reduced = get_reduced_data(qvarn, 'reduce_target')
-    assert reduced == {}
+    assert get_resource_values(qvarn, 'map_target', '_mr_value') == []
+    assert get_resource_values(qvarn, 'reduce_target', '_mr_value') == []

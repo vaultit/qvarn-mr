@@ -102,15 +102,13 @@ def process_map(qvarn, source_resource_type, resource_change, resource_id, handl
 
     elif resource_change == DELETED:
         for target_resource_type, handler in handlers:
-            for resource in qvarn.search(target_resource_type, _mr_source_id=resource_id,
-                                         show=('revision', '_mr_key')):
-                # Until reduce was not yet process, we don't want to delete this resource. Because
+            resources = qvarn.search(target_resource_type, _mr_source_id=resource_id)
+            for resource in qvarn.get_multiple(target_resource_type, resources):
+                # Until reduce was not yet processed, we don't want to delete this resource. Because
                 # reduce handlers need to know the key.
                 # All resources marked for deletion will be cleaned up after each update cycle.
-                qvarn.update(target_resource_type, resource['id'], {
-                    'revision': resource['revision'],
-                    '_mr_deleted': True,
-                })
+                resource['_mr_deleted'] = True
+                qvarn.update(target_resource_type, resource['id'], resource)
                 yield target_resource_type, resource['_mr_key']
 
     else:
@@ -122,6 +120,13 @@ def _map_reduce_resources(context, resources, handler):
     for resource in resources:
         for value in run(handler, context, resource):
             yield value
+
+
+def _iter_reduce_resource_ids(qvarn, source_resource_type, key):
+    resources = qvarn.search(source_resource_type, _mr_key=key, show=('_mr_deleted',))
+    for resource in resources:
+        if not resource['_mr_deleted']:
+            yield resource['id']
 
 
 def process_reduce(qvarn, source_resource_type, key, handlers, resync=False):
@@ -136,7 +141,7 @@ def process_reduce(qvarn, source_resource_type, key, handlers, resync=False):
         # Get all resources by given key, force result to be an iterator,
         # because in future we should query resources iteratively in order to
         # avoid huge memory consumptions.
-        resources = iter(qvarn.search(source_resource_type, _mr_key=key))
+        resources = _iter_reduce_resource_ids(qvarn, source_resource_type, key)
 
         if 'map' in handler:
             resources = _map_reduce_resources(context, resources, handler['map'])
