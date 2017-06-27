@@ -247,6 +247,9 @@ def process_changes(qvarn, config, changes, mappers, reducers, resync=False):
             logger.debug("incompatible mapped resource versions for key=%r of %r resource.", e.key,
                          source_resource_type)
 
+            # TODO: update all outdated reduce source resources, because otherwise reduce will have
+            #       to wait until whole resync process is done.
+
         except Exception:
             logger.exception("error while processing reduce handlers for %r, key=%r",
                              source_resource_type, key)
