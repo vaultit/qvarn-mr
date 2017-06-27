@@ -1,5 +1,6 @@
 from qvarnmr.clients.qvarn import QvarnApi
-from qvarnmr.processor import UPDATED, process_changes, process_reduce, get_handlers
+from qvarnmr.processor import UPDATED, Notification, process_changes, process_reduce
+from qvarnmr.handlers import get_handlers
 from qvarnmr.utils import chunks
 
 
@@ -9,7 +10,14 @@ def _no_action():
 
 def iter_map_resync_changes(qvarn: QvarnApi, source_resource_type: str):
     for resource_id in qvarn.get_list(source_resource_type):
-        yield source_resource_type, UPDATED, resource_id, _no_action
+        yield Notification(
+            resource_type=source_resource_type,
+            resource_change=UPDATED,
+            resource_id=resource_id,
+            notification_id=None,
+            listener_id=None,
+            generated=True,
+        )
 
 
 def iter_reduce_resync_keys(qvarn: QvarnApi, source_resource_type: str):

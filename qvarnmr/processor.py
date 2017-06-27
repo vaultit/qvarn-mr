@@ -1,9 +1,10 @@
 import logging
 
+from operator import itemgetter
+from itertools import groupby
 from collections import namedtuple
 
 from qvarnmr.func import run
-from qvarnmr.handlers import get_handlers
 from qvarnmr.utils import is_empty
 from qvarnmr.exceptions import HandlerVersionError
 
@@ -12,6 +13,15 @@ logger = logging.getLogger(__name__)
 
 RESOURCE_CHANGES = CREATED, UPDATED, DELETED = ('created', 'updated', 'deleted')
 
+Notification = namedtuple('Notification', [
+    'resource_type',
+    'resource_change',
+    'resource_id',
+    'notification_id',
+    'listener_id',
+    'generated',  # True - means notification is not coming from Qvarn, but is generated, and there
+                  # is no point to delete it.
+])
 
 Context = namedtuple('Context', [
     'qvarn',
@@ -32,14 +42,9 @@ def _clean_existing_resources(qvarn, target_resource_type, resources):
         qvarn.delete(target_resource_type, resource['id'])
 
 
-def _clean_deleted_resources(qvarn, target_resource_types):
-    for resource_type in target_resource_types:
-        for resource_id in qvarn.search(resource_type, _mr_deleted=True):
-            qvarn.delete(resource_type, resource_id)
-
-
 def _save_map_results(qvarn, handler, resource, target_resource_type, source_resource_type,
                       results):
+    resources_updated = 0
 
     for key, value in results:
         if isinstance(value, dict):
@@ -54,8 +59,9 @@ def _save_map_results(qvarn, handler, resource, target_resource_type, source_res
         value['_mr_version'] = handler['version']
 
         qvarn.create(target_resource_type, value)
+        resources_updated += 1
 
-        yield target_resource_type, key
+    return resources_updated
 
 
 def _save_reduce_result(qvarn, handler, resource, target_resource_type, key, value):
@@ -80,6 +86,7 @@ def _save_reduce_result(qvarn, handler, resource, target_resource_type, key, val
 
 
 def process_map(qvarn, source_resource_type, resource_change, resource_id, handlers, resync=False):
+    resources_updated = 0
     context = Context(qvarn, source_resource_type)
     if resource_change in (CREATED, UPDATED):
         resource = qvarn.get(source_resource_type, resource_id)
@@ -98,8 +105,8 @@ def process_map(qvarn, source_resource_type, resource_change, resource_id, handl
             # We have to clean all existing resources produced by map handler previously, because we
             # can't easily identify previously generated (key, value) pair with the new one.
             _clean_existing_resources(qvarn, target_resource_type, existing_resources)
-            yield from _save_map_results(qvarn, handler, resource, target_resource_type,
-                                         source_resource_type, results)
+            resources_updated += _save_map_results(qvarn, handler, resource, target_resource_type,
+                                                   source_resource_type, results)
 
     elif resource_change == DELETED:
         for target_resource_type, handler in handlers:
@@ -110,10 +117,12 @@ def process_map(qvarn, source_resource_type, resource_change, resource_id, handl
                 # All resources marked for deletion will be cleaned up after each update cycle.
                 resource['_mr_deleted'] = True
                 qvarn.update(target_resource_type, resource['id'], resource)
-                yield target_resource_type, resource['_mr_key']
+                resources_updated += 1
 
     else:
         raise ValueError('Unknown resource change type: %r' % resource_change)
+
+    return resources_updated
 
 
 def _map_reduce_resources(context, resources, handler):
@@ -164,61 +173,123 @@ def process_reduce(qvarn, config, source_resource_type, key, handlers, resync=Fa
 
 def process_changes(qvarn, config, changes, mappers, reducers, resync=False):
     changes_processed = 0
-    map_target_resources_types = set()
 
-    for resource_type, resource_change, resource_id, done in changes:
+    reduce_handler_sources = {
+        source
+        for target, handlers in config.items()
+        for source, handler in handlers.items()
+        if handler['type'] == 'reduce'
+    }
+
+    reduce_changes = []
+
+    # Run through all changes, process map handlers immediately and collect changes that have reduce
+    # handlers for processing in groups in the next step.
+    for notification in changes:
         try:
-            logger.debug("Processing map/reduce handlers for %r",
-                         (resource_type, resource_change, resource_id))
-
-            # Process all changed resources with map handlers.
-            keys = set(process_map(qvarn, resource_type, resource_change, resource_id,
-                                   mappers[resource_type], resync))
-            changes_processed += len(keys)
-
-            # Process all touched keys with reduce handlers.
-            for source_resource_type, key in keys:
-                process_reduce(qvarn, config, source_resource_type, key,
-                               reducers[source_resource_type], resync=False)
-
-            # Update set of map target resources types to be cleaned.
-            map_target_resources_types.update(resource_type for resource_type, key in keys)
-
-        except HandlerVersionError as e:
-            # We can't process reduce handlers if some source resources have not yet been updated to
-            # newest handler version.
-            if resync:
-                logger.warn("Incompatible handler versions for key=%r, during resync.", e.key)
-            else:
-                logger.debug("Incompatible handler versions for key=%r, updating the key.", e.key)
+            logger.debug("processing map handlers for %r", (
+                notification.resource_type, notification.resource_change, notification.resource_id,
+            ))
+            process_map(qvarn, notification.resource_type, notification.resource_change,
+                        notification.resource_id, mappers[notification.resource_type], resync)
 
         except Exception:
-            logger.exception("Error while processing map/reduce handlers for %r",
-                             (resource_type, resource_change, resource_id))
-        else:
-            done()
+            logger.exception("error while processing map handlers for %r", (
+                notification.resource_type, notification.resource_change, notification.resource_id,
+            ))
 
-    # Clean map target resources marked for deletion after all changes has been processed.
-    _clean_deleted_resources(qvarn, map_target_resources_types)
+            # Delete notifications even if handler raised exception. If there is an error in
+            # handler, there is no point retrying it. Once handler will be fixed, all his target
+            # resources will updated anyway.
+            _delete_notification(qvarn, notification)
+
+        else:
+            should_reduce = (
+                notification.resource_type in reduce_handler_sources and
+
+                # We ignore all delete notifications, since we don't delete mapped resources, we
+                # mark then as deleted first (and that generates UPDATED notification) and only then
+                # mapped resources are deleted (cleaned) completely. And once they are deleted for
+                # real, we are no longer interested in them.
+                notification.resource_change != DELETED
+            )
+            if should_reduce:
+                resource = qvarn.search_one(notification.resource_type, id=notification.resource_id,
+                                            show=('_mr_key',), default=None)
+                if resource is None:
+                    # It is very unlikely that we are going to end up here, but lets be sure.
+                    logger.error("resource %s of type %s was deleted.", notification.resource_id,
+                                 notification.resource_type)
+                    # If for some unknown reasons resource was deleted, then we can't get the key,
+                    # and without key, we can't call reduce handler. If this warning ever happens
+                    # situations should be investigated and fixed.
+                    _delete_notification(qvarn, notification)
+                    changes_processed += 1
+                else:
+                    # Collect all changes that have reduce handlers and process them later, grouped
+                    # by key. This will lower number of reduce handler calls.
+                    reduce_changes.append(((notification.resource_type, resource['_mr_key']),
+                                           notification))
+            else:
+                _delete_notification(qvarn, notification)
+                changes_processed += 1
+
+    # Process all changes with reduce handlers in groups.
+    reduce_changes = sorted(reduce_changes, key=itemgetter(0))
+    for (source_resource_type, key), group in groupby(reduce_changes, key=itemgetter(0)):
+        try:
+            process_reduce(qvarn, config, source_resource_type, key, reducers[source_resource_type],
+                           resync=False)
+
+        except HandlerVersionError as e:
+            # If we end up here, it means, that this key has inconsistent versions in mapped
+            # resources. In that case we postpone notification by leaving undeleted.
+            logger.debug("incompatible mapped resource versions for key=%r of %r resource.", e.key,
+                         source_resource_type)
+
+        except Exception:
+            logger.exception("error while processing reduce handlers for %r, key=%r",
+                             source_resource_type, key)
+
+            # Delete notifications even if handler raised exception. If there is an error in
+            # handler, there is no point retrying it. Once handler will be fixed, all his target
+            # resources will updated anyway.
+            for _, notification in group:
+                _delete_notification(qvarn, notification)
+
+        else:
+            # Delete processed mapped resources if they where marked for deletion.
+            for resource_id in qvarn.search(source_resource_type, _mr_key=key, _mr_deleted=True):
+                qvarn.delete(source_resource_type, resource_id)
+
+            # Delete processed notifications.
+            for _, notification in group:
+                _delete_notification(qvarn, notification)
+                changes_processed += 1
 
     return changes_processed
-
-
-def process(qvarn, listeners, config):
-    mappers, reducers = get_handlers(config)
-    changes = get_changes(qvarn, listeners)
-    process_changes(qvarn, config, changes, mappers, reducers)
 
 
 def get_changes(qvarn, listeners):
     for resource_type, listener in listeners:
         path = resource_type + '/listeners/' + listener['id'] + '/notifications'
-        notifications = qvarn.get_list(path)
-        for notification in notifications:
-            notification = qvarn.get(path, notification)
-            yield (
-                resource_type,
-                notification['resource_change'],
-                notification['resource_id'],
-                lambda: qvarn.delete(path, notification['id'])
+        for notification_id in qvarn.get_list(path):
+            notification = qvarn.get(path, notification_id)
+            yield Notification(
+                resource_type=resource_type,
+                resource_change=notification['resource_change'],
+                resource_id=notification['resource_id'],
+                notification_id=notification['id'],
+                listener_id=listener['id'],
+                generated=False,
             )
+
+
+def _delete_notification(qvarn, notification):
+    if not notification.generated:
+        logger.debug("delete notification %r", (
+            notification.resource_type, notification.resource_change, notification.resource_id,
+        ))
+
+        path = notification.resource_type + '/listeners/' + notification.listener_id + '/notifications'
+        qvarn.delete(path, notification.notification_id)

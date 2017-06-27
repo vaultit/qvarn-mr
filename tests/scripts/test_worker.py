@@ -2,7 +2,7 @@ from copy import deepcopy
 
 from qvarnmr.scripts import worker
 from qvarnmr.func import item, value
-from qvarnmr.testing.utils import get_reduced_data
+from qvarnmr.testing.utils import get_reduced_data, get_resource_values
 
 
 SCHEMA = {
@@ -98,24 +98,18 @@ def test_worker(pretender, qvarn, mocker, config):
         qvarn.create('source', {'key': 1, 'value': 3}),
     ]
     worker.main(['qvarnmr.testing.config', '-c', 'qvarnmr.cfg'])
-    reduced = qvarn.get_list('reduce_target')
-    reduced = qvarn.get('reduce_target', reduced[0])
-    assert reduced['_mr_value'] == 6 and reduced['_mr_key'] == 1
+    assert get_resource_values(qvarn, 'reduce_target', ('_mr_key', '_mr_value')) == [(1, 6)]
 
     # Update some resources.
     qvarn.update('source', resources[0]['id'], {'key': 1, 'value': 2})
     qvarn.update('source', resources[2]['id'], {'key': 1, 'value': 5})
     worker.main(['qvarnmr.testing.config', '-c', 'qvarnmr.cfg'])
-    reduced = qvarn.get_list('reduce_target')
-    reduced = qvarn.get('reduce_target', reduced[0])
-    assert reduced['_mr_value'] == 9 and reduced['_mr_key'] == 1
+    assert get_resource_values(qvarn, 'reduce_target', ('_mr_key', '_mr_value')) == [(1, 9)]
 
     # Delete some resources.
     qvarn.delete('source', resources[2]['id'])
     worker.main(['qvarnmr.testing.config', '-c', 'qvarnmr.cfg'])
-    reduced = qvarn.get_list('reduce_target')
-    reduced = qvarn.get('reduce_target', reduced[0])
-    assert reduced['_mr_value'] == 4 and reduced['_mr_key'] == 1
+    assert get_resource_values(qvarn, 'reduce_target', ('_mr_key', '_mr_value')) == [(1, 4)]
 
 
 def test_auto_resync(pretender, qvarn, mocker, config):

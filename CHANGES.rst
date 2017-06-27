@@ -4,6 +4,9 @@ Change History
 0.1.1 (unreleased)
 ------------------
 
+- Reduce handlers now are processed using Qvarn notifications. This should
+  solve possible cases related with eventual consistency.
+
 - ``qvarnmr-resync`` script was replaced by automatic synchronisation. So now,
   it is enought to just run ``qvarnmr-worker`` and all the sinchronisation will
   happen automatically. You just need to restart ``qvarnmr-worker`` after

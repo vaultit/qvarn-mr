@@ -31,7 +31,7 @@ def main(argv: list=None):
         # We don't want to suspend whole map/reduce engine while full resync is in progress. That is
         # why, we continue to process newest changes, while full resync is in progress.
         changes = get_changes(qvarn, listeners)
-        process_changes(qvarn, config, changes, mappers, reducers)
+        process_changes(qvarn, handlers, changes, mappers, reducers)
 
     # Watch notifications and process map/reduce handlers forever.
     while True:
@@ -39,11 +39,13 @@ def main(argv: list=None):
         changes_processed = process_changes(qvarn, handlers, changes, mappers, reducers)
 
         if args.forever:
-            # If no changes was processed go into sleep mode and wait a few
-            # moments before checking for more changes.
             if changes_processed == 0:
+                # If no changes were processed go into sleep mode and wait a few moments before
+                # checking for more changes.
                 time.sleep(0.5)
-        else:
+        elif changes_processed == 0:
+            # If forever flag is not set, wait untill all pending changes are processed and then
+            # exit the loop.
             break
 
 

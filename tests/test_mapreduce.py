@@ -1,8 +1,7 @@
 from unittest import mock
 
-from qvarnmr.func import join, item, count, mr_func
-from qvarnmr.processor import process
-from qvarnmr.testing.utils import cleaned
+from qvarnmr.func import join, item, count, value
+from qvarnmr.testing.utils import cleaned, get_resource_values, get_reduced_data, process
 from qvarnmr.listeners import get_or_create_listeners
 
 
@@ -120,16 +119,15 @@ def test_mapreduce(pretender, qvarn):
         '_mr_deleted': 0,
     }
 
-    reduced = qvarn.get_list('company_reports')
-    assert len(reduced) == 1
-    reduced = qvarn.get('company_reports', reduced[0])
-    assert cleaned(reduced) == {
-        'type': 'company_report',
-        '_mr_key': org['id'],
-        '_mr_value': None,
-        '_mr_version': 1,
-        'org_id': org['id'],
-        'report_id': reports[1]['id'],
+    assert get_reduced_data(qvarn, 'company_reports') == {
+        org['id']: {
+            'type': 'company_report',
+            '_mr_key': org['id'],
+            '_mr_value': None,
+            '_mr_version': 1,
+            'org_id': org['id'],
+            'report_id': reports[1]['id'],
+        }
     }
 
 
@@ -270,11 +268,6 @@ def test_create_update_delete_flow(pretender, qvarn):
         },
     })
 
-    @mr_func()
-    def sum_values(context, resources):
-        resources = context.qvarn.get_multiple(context.source_resource_type, resources)
-        return sum(x['_mr_value'] for x in resources)
-
     config = {
         'data_mapped': {
             'data': {
@@ -287,7 +280,8 @@ def test_create_update_delete_flow(pretender, qvarn):
             'data_mapped': {
                 'type': 'reduce',
                 'version': 1,
-                'handler': sum_values(),
+                'handler': sum,
+                'map': value()
             },
         },
     }
@@ -301,9 +295,9 @@ def test_create_update_delete_flow(pretender, qvarn):
         qvarn.create('data', {'key': 1, 'value': 3}),
     ]
     process(qvarn, listeners, config)
-    reduced = qvarn.get_list('data_reduced')
-    reduced = qvarn.get('data_reduced', reduced[0])
-    assert reduced['_mr_value'] == 6 and reduced['_mr_key'] == 1
+    assert get_resource_values(qvarn, 'data_reduced', ('_mr_key', '_mr_value')) == [
+        (1, 6),
+    ]
 
     # Update some resources.
     qvarn.update('data', resources[0]['id'], {'key': 1, 'value': 2})
@@ -405,11 +399,17 @@ def test_reduce_handler_error(pretender, qvarn):
 
     # Try to process changes.
     process(qvarn, listeners, config)
+    assert get_resource_values(qvarn, 'data_mapped', ('_mr_key', '_mr_value')) == [
+        (1, 1),
+        (1, 2),
+        (1, 3),
+    ]
 
     # Since reducer failed, all notifications should be left in queue.
     listeners = dict(get_or_create_listeners(qvarn, 'test', config))
-    notifications = qvarn.get_list('data/listeners/' + listeners['data']['id'] + '/notifications')
-    assert len(notifications) == 3
+    assert len(qvarn.get_list('data/listeners/' + listeners['data']['id'] + '/notifications')) == 0
+    assert len(qvarn.get_list('data_mapped/listeners/' + listeners['data_mapped']['id'] +
+                              '/notifications')) == 0
 
 
 def test_map_outputs_dict_value(pretender, qvarn):

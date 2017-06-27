@@ -35,6 +35,26 @@ def test_get_listeners(pretender, qvarn):
                 },
             ],
         },
+        'data__map': {
+            'path': '/data__map',
+            'type': 'data__map',
+            'versions': [
+                {
+                    'version': 'v1',
+                    'prototype': {
+                        'type': '',
+                        'id': '',
+                        'revision': '',
+                        '_mr_key': '',
+                        '_mr_value': '',
+                        '_mr_source_id': '',
+                        '_mr_source_type': '',
+                        '_mr_version': 0,
+                        '_mr_deleted': False,
+                    },
+                },
+            ],
+        },
     })
 
     config = {
@@ -59,12 +79,18 @@ def test_get_listeners(pretender, qvarn):
 
     listeners = get_or_create_listeners(qvarn, 'test', config)
 
-    data2_qvarnmr_listener = qvarn.search_one('qvarnmr_listeners', instance='test', resource_type='data2')
+    data2_qvarnmr_listener = qvarn.search_one('qvarnmr_listeners', instance='test',
+                                              resource_type='data2')
     data2_listener = qvarn.get('data2/listeners', data2_qvarnmr_listener['listener_id'])
+
+    data__map_qvarnmr_listener = qvarn.search_one('qvarnmr_listeners', instance='test',
+                                                  resource_type='data__map')
+    data__map_listener = qvarn.get('data__map/listeners', data__map_qvarnmr_listener['listener_id'])
 
     assert sorted(listeners, key=itemgetter(0)) == [
         ('data1', data1_listener),
         ('data2', data2_listener),
+        ('data__map', data__map_listener),
     ]
 
     assert len(qvarn.get_list('data1/listeners')) == 1
