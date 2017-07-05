@@ -1,0 +1,38 @@
+# Required variables:
+# PACKAGE_BUILD_IMAGE
+# PACKAGE_UPLOAD_IMAGE
+# TARGET_SUITE
+# DPUT_REPOSITORY_NAME
+
+debian_package:
+  stage: build
+  image: $PACKAGE_BUILD_IMAGE
+  script:
+    - ./build-debian-package $TARGET_SUITE 1
+    - mv ../*.build ../*.changes ../*.dsc ../*.tar.* ../*.deb ./
+  tags:
+    - packaging
+  artifacts:
+    paths:
+      - "*.build"
+      - "*.changes"
+      - "*.dsc"
+      - "*.tar.*"
+      - "*.deb"
+
+upload_package:
+  stage: deploy
+  image: $PACKAGE_UPLOAD_IMAGE
+  before_script:
+    - /bin/decrypt_secrets.sh
+  script:
+    - debsign -k$GPGKEYID *.changes
+    - dput $DPUT_REPOSITORY_NAME *.changes
+  tags:
+    - packaging
+  only:
+    - master
+  artifacts:
+    paths:
+      - "*.changes"
+      - "*.dsc"
