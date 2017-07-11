@@ -151,17 +151,14 @@ example of configuration file:
     verify_requests = no
     scope = scope1,scope2,scope3
 
-    [gluu]
-    base_url = https://gluu-example.tld
-
     [qvarnmr]
     instance = instance-name
 
 In this configuration file you need to specify connection parameters for the
-Qvarn and Gluu. Also you need to specify qvarnmr instance name. This name will
-be used to know which notification handlers to use. There can be multiple
-qvarnmr instances running, each processing different handlers. In order to
-distinguish between these qvarnmr instances, instance name is used.
+Qvarn. Also you need to specify qvarnmr instance name. This name will be used
+to know which notification handlers to use. There can be multiple qvarnmr
+instances running, each processing different handlers. In order to distinguish
+between these qvarnmr instances, instance name is used.
 
 Probably it's a good idea to use project domain name as instance name. But
 basically it can be anything, just make sure, that two instances does not have

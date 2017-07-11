@@ -14,9 +14,6 @@ CONFIG = {
         'client_secret': 'verysecret',
         'scope': 'scope1,scope2,scope3',
     },
-    'gluu': {
-        'base_url': 'https://gluu-example.tld',
-    },
     'qvarnmr': {
         'instance': 'test',
     }
