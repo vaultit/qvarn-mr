@@ -131,6 +131,39 @@ internal state:
         version: 0
       version: v1
 
+Also qvarnmr worker requires these Qvarn scopes::
+
+    uapi_qvarnmr_listeners_post
+    uapi_qvarnmr_listeners_id_get
+    uapi_qvarnmr_listeners_id_delete
+    uapi_qvarnmr_listeners_search_id_get
+
+    uapi_qvarnmr_handlers_post
+    uapi_qvarnmr_handlers_id_get
+    uapi_qvarnmr_handlers_id_put
+    uapi_qvarnmr_handlers_id_delete
+    uapi_qvarnmr_handlers_search_id_get
+
+    uapi_<target>_get
+    uapi_<target>_post
+    uapi_<target>_id_get
+    uapi_<target>_id_put
+    uapi_<target>_id_delete
+    uapi_<target>_search_id_get
+
+    uapi_<source>_get
+    uapi_<source>_post
+    uapi_<source>_id_get
+    uapi_<source>_id_put
+    uapi_<source>_id_delete
+    uapi_<source>_search_id_get
+    uapi_<source>_listeners_post
+    uapi_<source>_listeners_id_get
+    uapi_<source>_listeners_id_delete
+    uapi_<source>_listeners_id_notifications_get
+    uapi_<source>_listeners_id_notifications_id_get
+    uapi_<source>_listeners_id_notifications_id_delete
+
 Once you have defined handlers and new resource types, you run
 ``qvarnmr-worker``::
 
@@ -155,14 +188,14 @@ example of configuration file:
     instance = instance-name
 
 In this configuration file you need to specify connection parameters for the
-Qvarn. Also you need to specify qvarnmr instance name. This name will be used
-to know which notification handlers to use. There can be multiple qvarnmr
+Qvarn. Also you need to specify qvarnmr **instance name**. This name will be
+used to know which notification handlers to use. There can be multiple qvarnmr
 instances running, each processing different handlers. In order to distinguish
 between these qvarnmr instances, instance name is used.
 
-Probably it's a good idea to use project domain name as instance name. But
-basically it can be anything, just make sure, that two instances does not have
-the same name, because then each will steal notifications from one another.
+Probably it's a good idea to use project name as **instance name**. Because if
+multiple projects will run on the same Qvarn database instance, then they will
+not steal notifications from each other.
 
 ``-f`` stands for *forever*.
 
