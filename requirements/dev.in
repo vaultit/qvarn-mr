@@ -1,0 +1,19 @@
+pip-tools
+
+# Test dependencies
+pytest
+pytest-cov
+pytest-mock
+pytest-catchlog
+requests-mock
+webtest
+freezegun
+
+# Qvarn dependencies
+# https://github.com/ProgrammersOfVilnius/qvarn/releases
+PyJWT
+bottle
+psycopg2
+pyyaml
+uwsgidecorators
+qvarn
