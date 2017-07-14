@@ -116,6 +116,8 @@ internal state:
         instance: ''
         resource_type: ''
         listener_id: ''
+        owner: ''
+        timestamp: ''
       version: v1
 
     path: /qvarnmr_handlers
@@ -133,11 +135,14 @@ internal state:
 
 Also qvarnmr worker requires these Qvarn scopes::
 
+    uapi_qvarnmr_listeners_get
     uapi_qvarnmr_listeners_post
     uapi_qvarnmr_listeners_id_get
+    uapi_qvarnmr_listeners_id_put
     uapi_qvarnmr_listeners_id_delete
     uapi_qvarnmr_listeners_search_id_get
 
+    uapi_qvarnmr_handlers_get
     uapi_qvarnmr_handlers_post
     uapi_qvarnmr_handlers_id_get
     uapi_qvarnmr_handlers_id_put

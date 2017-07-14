@@ -415,12 +415,16 @@ RESOURCE_TYPES = {
                     'id': '',
                     'type': '',
                     'revision': '',
-                    # QvarnMR deployed instance name.
+                    # Name of a project using qvarn-mr.
                     'instance': '',
                     # Resource type to listen for.
                     'resource_type': '',
                     # Listener id assigned for the resource type.
                     'listener_id': '',
+                    # Owner process currently listeting for notifications.
+                    'owner': '',
+                    # Date and time showing when the owner was active last time.
+                    'timestamp': '',
                 },
             },
         ],

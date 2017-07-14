@@ -274,7 +274,7 @@ def process_changes(qvarn, config, changes, mappers, reducers, resync=False):
 
 
 def get_changes(qvarn, listeners):
-    for resource_type, listener in listeners:
+    for resource_type, listener, state in listeners:
         path = resource_type + '/listeners/' + listener['id'] + '/notifications'
         for notification_id in qvarn.get_list(path):
             notification = qvarn.get(path, notification_id)

@@ -43,10 +43,40 @@ def get_resource_values(qvarn, target, field):
     return sorted(result)
 
 
-def update_resource(qvarn, resource_type, resource_id, **kwargs):
-    resource = qvarn.get(resource_type, resource_id)
-    resource.update(kwargs)
-    qvarn.update(resource_type, resource_id, resource)
+def update_resource(qvarn, _resource_type, *args, **kwargs):
+    """Update resource content.
+
+    Update resource by resource id:
+
+        update_resource(qvarn, 'resource_type', resource_id)(value=42)
+
+    Update resource by search query:
+
+        update_resource(qvarn, 'resource_type', field=value)(value=42)
+
+    Update resource assuming only one resource exists:
+
+        update_resource(qvarn, 'resource_type')(value=42)
+
+    """
+    assert len(args) <= 1
+
+    if len(args) == 0 and not kwargs:
+        resources = qvarn.get_list(_resource_type)
+        assert len(resources) == 1
+        resource = qvarn.get(_resource_type, resources[0])
+
+    elif len(args) == 1:
+        resource = qvarn.get(_resource_type, args[0])
+
+    else:
+        resource = qvarn.search_one(_resource_type, **kwargs)
+
+    def updater(**data):
+        resource.update(data)
+        return qvarn.update(_resource_type, resource['id'], resource)
+
+    return updater
 
 
 def process(qvarn, listeners, config, limit=10):

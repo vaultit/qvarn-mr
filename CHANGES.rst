@@ -1,9 +1,15 @@
 Change History
 ==============
 
-0.1.2 (unreleased)
+0.1.3 (unreleased)
 ------------------
 
+0.1.2 (2017-07-14)
+------------------
+
+- Added checks to make sure that one worker is running. This required some
+  schema changes, two fields ``owner`` and ``timestamp`` where added to
+  ``qvarnmr_handlers`` resource type.
 
 0.1.1 (2017-06-27)
 ------------------

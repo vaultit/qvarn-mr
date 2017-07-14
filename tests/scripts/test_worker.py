@@ -1,8 +1,9 @@
+from io import StringIO
 from copy import deepcopy
 
 from qvarnmr.scripts import worker
 from qvarnmr.func import item, value
-from qvarnmr.testing.utils import get_reduced_data, get_resource_values
+from qvarnmr.testing.utils import get_reduced_data, get_resource_values, update_resource
 
 
 SCHEMA = {
@@ -155,3 +156,27 @@ def test_auto_resync(pretender, qvarn, mocker, config):
     worker.main(['qvarnmr.testing.config', '-c', 'qvarnmr.cfg'])
     reduced = get_reduced_data(qvarn, 'reduce_target', 1)
     assert reduced[1]['_mr_value'] == 2
+
+
+def test_check_for_running_workers(pretender, qvarn, mocker, config):
+    mocker.patch('qvarnmr.scripts.worker.set_config')
+    mocker.patch('qvarnmr.scripts.worker.setup_qvarn_client', return_value=qvarn.client)
+    mocker.patch('qvarnmr.testing.config', CONFIG, create=True)
+
+    pretender.add_resource_types(SCHEMA)
+
+    # Run worker from host1, process all changes and quit.
+    mocker.patch('socket.gethostname', return_value='host1')
+    mocker.patch('os.getpid', return_value=1)
+    assert worker.main(['qvarnmr.testing.config', '-c', 'qvarnmr.cfg']) is None
+
+    # Run worker from host2, lock from host2 should be released.
+    mocker.patch('socket.gethostname', return_value='host2')
+    assert worker.main(['qvarnmr.testing.config', '-c', 'qvarnmr.cfg']) is None
+
+    # Run worker from host3 while owner is still set.
+    output = mocker.patch('sys.stdout', StringIO())
+    mocker.patch('socket.gethostname', return_value='host3')
+    update_resource(qvarn, 'qvarnmr_listeners', resource_type='source')(owner='host3')
+    assert worker.main(['qvarnmr.testing.config', '-c', 'qvarnmr.cfg']) == 1
+    assert output.getvalue() == 'map/reduce engine is already running on host3\n'

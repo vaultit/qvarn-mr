@@ -205,7 +205,7 @@ def test_reduce_half_synced_key(pretender, qvarn):
     # Update a source resource.
     # Since not all map_target resources where updated with new handler, reduce processor should
     # skip all such sources.
-    update_resource(qvarn, 'source', data[1]['id'], value=4)
+    update_resource(qvarn, 'source', data[1]['id'])(value=4)
     process(qvarn, listeners, config)
     assert get_resource_values(qvarn, 'map_target', ('_mr_key', '_mr_value', '_mr_version')) == [
         ('1', 2, 1),
@@ -218,7 +218,7 @@ def test_reduce_half_synced_key(pretender, qvarn):
     ]
 
     # Update the other resource.
-    update_resource(qvarn, 'source', data[0]['id'], value=3)
+    update_resource(qvarn, 'source', data[0]['id'])(value=3)
     process(qvarn, listeners, config)
     assert get_resource_values(qvarn, 'map_target', ('_mr_key', '_mr_value', '_mr_version')) == [
         ('1', 6, 2),

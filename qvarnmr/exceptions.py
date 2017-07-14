@@ -4,3 +4,7 @@ class HandlerVersionError(Exception):
     def __init__(self, key, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.key = key
+
+
+class BusyListenerError(Exception):
+    pass

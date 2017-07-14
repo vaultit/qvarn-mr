@@ -406,7 +406,10 @@ def test_reduce_handler_error(pretender, qvarn):
     ]
 
     # Since reducer failed, all notifications should be left in queue.
-    listeners = dict(get_or_create_listeners(qvarn, 'test', config))
+    listeners = {
+        listener.source_resource_type: listener.listener
+        for listener in get_or_create_listeners(qvarn, 'test', config)
+    }
     assert len(qvarn.get_list('data/listeners/' + listeners['data']['id'] + '/notifications')) == 0
     assert len(qvarn.get_list('data_mapped/listeners/' + listeners['data_mapped']['id'] +
                               '/notifications')) == 0
