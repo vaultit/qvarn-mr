@@ -73,9 +73,17 @@ def check_and_update_listeners_state(qvarn, listeners: list, interval: float=10,
     for listener in listeners:
         now = datetime.datetime.utcnow()
         state = listener.state
-        owner = state['owner'] or signature
         timestamp = (now if state['timestamp'] is None else
                      datetime.datetime.strptime(state['timestamp'], DATETIME_FORMAT))
+
+        # If more than <timeout> time has passed, fetch state from Qvarn because it could be changed
+        # by another process.
+        if now - timestamp >= timeout:
+            state = qvarn.get('qvarnmr_listeners', state['id'])
+            timestamp = (now if state['timestamp'] is None else
+                         datetime.datetime.strptime(state['timestamp'], DATETIME_FORMAT))
+
+        owner = state['owner'] or signature
 
         outdated = owner == signature and now - timestamp > interval
         timedout = owner != signature and now - timestamp > timeout
