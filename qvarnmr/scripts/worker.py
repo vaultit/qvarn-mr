@@ -1,6 +1,8 @@
 import argparse
 import time
 import sys
+import logging
+import datetime
 
 from qvarnmr.config import get_config, set_config
 from qvarnmr.clients.qvarn import QvarnApi, setup_qvarn_client
@@ -12,11 +14,14 @@ from qvarnmr.listeners import (
     get_or_create_listeners,
     check_and_update_listeners_state,
     clear_listener_owners,
+    get_worker_signature,
 )
 
 
 LISTENER_UPDATE_INTERVAL = 10  # seconds
 LISTENER_TIMEOUT = 60  # seconds
+
+logger = logging.getLogger(__name__)
 
 
 def main(argv: list=None):
@@ -25,6 +30,9 @@ def main(argv: list=None):
     parser.add_argument('-c', '--config', required=True, help="app config file")
     parser.add_argument('-f', '--forever', action='store_true', default=False, help="process changes forever")
     args = parser.parse_args(argv)
+
+    now = datetime.datetime.utcnow()
+    logger.info("starting map/reduce worker on %s at %s", get_worker_signature(), now.isoformat())
 
     set_config(args.config)
     config = get_config()
@@ -58,6 +66,8 @@ def main(argv: list=None):
             # That is why, we continue to process newest changes, while full resync is in progress.
             changes = get_changes(qvarn, listeners)
             engine.process_changes(changes)
+
+        logger.info("entering the main loop")
 
         # Watch notifications and process map/reduce handlers forever.
         while True:

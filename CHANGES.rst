@@ -14,6 +14,12 @@ Change History
 - process_changes function was refactored to MapReduceEngine.process_changes
   method.
 
+- Proper logging was added, now it is possible to see what is happening inside
+  qvarn-mr by looking at logs.
+
+- Fix full reduce resync bug, it seems, that full reduce resync was blockin
+  whole map/reduce process while resyncing.
+
 0.1.2 (2017-07-14)
 ------------------
 
