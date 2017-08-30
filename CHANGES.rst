@@ -4,6 +4,16 @@ Change History
 0.1.3 (unreleased)
 ------------------
 
+- Now keep alive updates are done after each map/reduce handler processing.
+  Previously keep alive updates happend only after each map/reduce changes
+  batch.
+
+- Keep alive update automatically refeshes state resource from Qvarn if time
+  from alast update is bigger than timeout.
+
+- process_changes function was refactored to MapReduceEngine.process_changes
+  method.
+
 0.1.2 (2017-07-14)
 ------------------
 

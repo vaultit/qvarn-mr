@@ -1,6 +1,5 @@
 from qvarnmr.clients.qvarn import QvarnApi
-from qvarnmr.processor import UPDATED, Notification, process_changes, process_reduce
-from qvarnmr.handlers import get_handlers
+from qvarnmr.processor import UPDATED, Notification, MapReduceEngine, process_reduce
 from qvarnmr.utils import chunks
 
 
@@ -68,14 +67,12 @@ def iter_changed_handlers(qvarn: QvarnApi, config: dict, handler_type: str):
                     yield target_resource_type, source_resource_type, handler
 
 
-def resync_changed_handlers(qvarn: QvarnApi, config: dict, instance: str):
-    mappers, reducers = get_handlers(config)
-
+def resync_changed_handlers(qvarn: QvarnApi, engine: MapReduceEngine, instance: str):
     # First resync all map handlers.
-    handlers = iter_changed_handlers(qvarn, config, 'map')
+    handlers = iter_changed_handlers(qvarn, engine.config, 'map')
     for target_resource_type, source_resource_type, handler in handlers:
         for changes in chunks(100, iter_map_resync_changes(qvarn, source_resource_type)):
-            process_changes(qvarn, config, changes, mappers, reducers, resync=True)
+            engine.process_changes(changes, resync=True)
             yield
         # Update handler version only when full resync is successfully done.
         update_handler_version(qvarn, instance, target_resource_type, source_resource_type,
@@ -85,11 +82,11 @@ def resync_changed_handlers(qvarn: QvarnApi, config: dict, instance: str):
     # to resync map handlers. And by the way, `process_changes` automatically calls
     # `process_reduce`, so here we might have some duplication if both, map and related reduce
     # handlers where updated. That is something, that could be optimized.
-    handlers = iter_changed_handlers(qvarn, config, 'reduce')
+    handlers = iter_changed_handlers(qvarn, engine.config, 'reduce')
     for target_resource_type, source_resource_type, handler in handlers:
         for keys in chunks(100, iter_reduce_resync_keys(qvarn, source_resource_type)):
             for key in keys:
-                process_reduce(qvarn, config, source_resource_type, key,
+                process_reduce(qvarn, engine.config, source_resource_type, key,
                                [(target_resource_type, handler)], resync=True)
         # Update handler version only when full resync is successfully done.
         update_handler_version(qvarn, instance, target_resource_type, source_resource_type,
