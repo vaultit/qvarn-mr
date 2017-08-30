@@ -50,9 +50,12 @@ def main(argv: list=None):
 
         def keep_alive():
             nonlocal listeners
-            listeners = check_and_update_listeners_state(qvarn, listeners,
-                                                         interval=LISTENER_UPDATE_INTERVAL,
-                                                         timeout=LISTENER_TIMEOUT)
+            listeners = check_and_update_listeners_state(
+                qvarn, listeners,
+                interval=config.getfloat('qvarnmr', 'keep_alive_update_interval',
+                                         fallback=LISTENER_UPDATE_INTERVAL),
+                timeout=config.getfloat('qvarnmr', 'keep_alive_timeout', fallback=LISTENER_TIMEOUT),
+            )
 
         # Immediately check if another map/reduce processor is not running.
         keep_alive()

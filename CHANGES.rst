@@ -20,6 +20,9 @@ Change History
 - Fix full reduce resync bug, it seems, that full reduce resync was blockin
   whole map/reduce process while resyncing.
 
+- Configurable keep alive parameters using **keep_alive_update_interval** and
+  **keep_alive_timeout** configuration file options.
+
 0.1.2 (2017-07-14)
 ------------------
 
