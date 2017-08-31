@@ -1,5 +1,11 @@
-qvarn-mr (1.1.1-1) jessie; urgency=medium
+qvarn-mr (1.1.4-1) jessie; urgency=medium
 
-  * Initial release.
+    * Proper logging
 
- -- POV Team <tilaajavastuu@pov.lt>  Mon, 19 Jun 2017 15:44:41 +0000
+    * Configurable keep alive parameters
+
+    * Keep alive updates after each handler processing
+
+    * Fix reduce full resync bug
+
+ -- POV Team <tilaajavastuu@pov.lt>  Thu, 31 Aug 2017 10:30:00 +0300

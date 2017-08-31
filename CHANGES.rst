@@ -1,6 +1,17 @@
 Change History
 ==============
 
+0.1.4 (2017-08-31)
+------------------
+
+- Proper logging
+
+- Configurable keep alive parameters
+
+- Keep alive updates after each handler processing
+
+- Fix reduce full resync bug
+
 0.1.3 (unreleased)
 ------------------
 
