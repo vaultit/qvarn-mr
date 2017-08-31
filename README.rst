@@ -177,8 +177,11 @@ Once you have defined handlers and new resource types, you run
 Here ``path.to.handlers`` is a Python path to your map/reduce handlers
 configuration.
 
+``-f`` stands for *forever*.
+
 ``-c path/to/qvarnmr.cfg`` is a Python configparser configuration file. Here is
 example of configuration file:
+
 
 .. code-block:: ini
 
@@ -191,6 +194,8 @@ example of configuration file:
 
     [qvarnmr]
     instance = instance-name
+    keep_alive_update_interval = 10  # seconds
+    keep_alive_timeout = 60  # seconds
 
 In this configuration file you need to specify connection parameters for the
 Qvarn. Also you need to specify qvarnmr **instance name**. This name will be
@@ -202,7 +207,12 @@ Probably it's a good idea to use project name as **instance name**. Because if
 multiple projects will run on the same Qvarn database instance, then they will
 not steal notifications from each other.
 
-``-f`` stands for *forever*.
+**keep_alive_update_interval** allows you to control how often a warker need
+no announce that it is still alive and **keep_alive_timeout** is a time since
+last update when a worker is considered as crashed in case if worker did not
+had a chance to clean up befor exit. Even if a worker is crashed you will not
+be able to run another until **keep_alive_timeout** time is passed. All times
+are specified in seconds.
 
 That's it.
 

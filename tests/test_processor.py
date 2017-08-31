@@ -1,8 +1,8 @@
 from qvarnmr.processor import UPDATED
-from qvarnmr.processor import process_map
+from qvarnmr.processor import process_map, MapReduceEngine
 from qvarnmr.func import item, value
 from qvarnmr.handlers import get_handlers
-from qvarnmr.listeners import get_or_create_listeners
+from qvarnmr.listeners import get_or_create_listeners, check_and_update_listeners_state
 from qvarnmr.testing.utils import get_mapped_data, get_resource_values, update_resource, process
 
 
@@ -228,4 +228,44 @@ def test_reduce_half_synced_key(pretender, qvarn):
     assert get_resource_values(qvarn, 'reduce_target', ('_mr_key', '_mr_value')) == [
         ('1', 14),
         ('2', 1),
+    ]
+
+
+def test_callbacks(pretender, qvarn, mocker, freezetime):
+    pretender.add_resource_types(SCHEMA)
+
+    mocker.patch('socket.gethostname', return_value='hostname')
+    mocker.patch('os.getpid', return_value=1)
+
+    config = {
+        'map_target': {
+            'source': {
+                'type': 'map',
+                'version': 1,
+                'handler': item('key'),
+            },
+        },
+    }
+
+    engine = MapReduceEngine(qvarn, config)
+    listeners = get_or_create_listeners(qvarn, 'test', config)
+
+    def keep_alive():
+        nonlocal listeners
+        listeners = check_and_update_listeners_state(qvarn, listeners, interval=10, timeout=60)
+
+    for event in ('map_handler_processed', 'reduce_handler_processed'):
+        engine.add_callback(event, keep_alive)
+
+    qvarn.create('source', {'key': '1', 'value': 2}),
+    qvarn.create('source', {'key': '1', 'value': 3}),
+
+    freezetime('2017-07-12 00:00:00')
+    process(qvarn, listeners, engine)
+    assert get_resource_values(qvarn, 'map_target', ('_mr_source_type', '_mr_key')) == [
+        ('source', '1'),
+        ('source', '1'),
+    ]
+    assert get_resource_values(qvarn, 'qvarnmr_listeners', ('owner', 'timestamp')) == [
+        ('hostname/1', '2017-07-12T00:00:00.000000'),
     ]

@@ -1,12 +1,14 @@
 import os
 import socket
 import datetime
+import logging
 
 from collections import namedtuple
 
 from qvarnmr.constants import DATETIME_FORMAT
 from qvarnmr.exceptions import BusyListenerError
 
+logger = logging.getLogger(__name__)
 
 Listener = namedtuple('Listener', ('source_resource_type', 'listener', 'state'))
 
@@ -68,26 +70,44 @@ def check_and_update_listeners_state(qvarn, listeners: list, interval: float=10,
     result = []
     interval = datetime.timedelta(seconds=interval)
     timeout = datetime.timedelta(seconds=timeout)
-    signature = '%s/%s' % (socket.gethostname(), os.getpid())
+    signature = get_worker_signature()
 
     for listener in listeners:
         now = datetime.datetime.utcnow()
         state = listener.state
-        owner = state['owner'] or signature
         timestamp = (now if state['timestamp'] is None else
                      datetime.datetime.strptime(state['timestamp'], DATETIME_FORMAT))
+
+        # If more than <timeout> time has passed, fetch state from Qvarn because it could be changed
+        # by another process.
+        if now - timestamp >= timeout:
+            logger.warn("refresh state resource timeout=%.2fs time=%.2fs",
+                        timeout.total_seconds(), (now - timestamp).total_seconds())
+            state = qvarn.get('qvarnmr_listeners', state['id'])
+            timestamp = (now if state['timestamp'] is None else
+                         datetime.datetime.strptime(state['timestamp'], DATETIME_FORMAT))
+
+        owner = state['owner'] or signature
 
         outdated = owner == signature and now - timestamp > interval
         timedout = owner != signature and now - timestamp > timeout
         busy = owner != signature and now - timestamp <= timeout
 
         if outdated or timedout or state['timestamp'] is None or state['owner'] is None:
+            logger.debug('update keep alive state signature=%s owner=%s time=%s timeout=%s '
+                         'interval=%s timestamp=%s', signature, owner,
+                         (now - timestamp).total_seconds(), timeout.total_seconds(),
+                         interval.total_seconds(), now.strftime(DATETIME_FORMAT))
             state = qvarn.update('qvarnmr_listeners', state['id'], dict(
                 state,
                 owner=signature,
                 timestamp=now.strftime(DATETIME_FORMAT),
             ))
         elif busy:
+            logger.error('map/reduce database has busy state signature=%s owner=%s time=%s '
+                         'timeout=%s interval=%s', signature, owner,
+                         (now - timestamp).total_seconds(), timeout.total_seconds(),
+                         interval.total_seconds())
             raise BusyListenerError("map/reduce engine is already running on %s" % owner)
 
         result.append(listener._replace(state=state))
@@ -122,3 +142,7 @@ def clear_listener_owners(qvarn, listeners: list):
         ))
         result.append(listener._replace(state=state))
     return result
+
+
+def get_worker_signature():
+    return '%s/%s' % (socket.gethostname(), os.getpid())

@@ -1,8 +1,38 @@
 Change History
 ==============
 
+0.1.4 (2017-08-31)
+------------------
+
+- Proper logging
+
+- Configurable keep alive parameters
+
+- Keep alive updates after each handler processing
+
+- Fix reduce full resync bug
+
 0.1.3 (unreleased)
 ------------------
+
+- Now keep alive updates are done after each map/reduce handler processing.
+  Previously keep alive updates happend only after each map/reduce changes
+  batch.
+
+- Keep alive update automatically refeshes state resource from Qvarn if time
+  from alast update is bigger than timeout.
+
+- process_changes function was refactored to MapReduceEngine.process_changes
+  method.
+
+- Proper logging was added, now it is possible to see what is happening inside
+  qvarn-mr by looking at logs.
+
+- Fix full reduce resync bug, it seems, that full reduce resync was blockin
+  whole map/reduce process while resyncing.
+
+- Configurable keep alive parameters using **keep_alive_update_interval** and
+  **keep_alive_timeout** configuration file options.
 
 0.1.2 (2017-07-14)
 ------------------

@@ -1,7 +1,6 @@
 from itertools import count
 
-from qvarnmr.handlers import get_handlers
-from qvarnmr.processor import get_changes, process_changes
+from qvarnmr.processor import get_changes, MapReduceEngine
 
 
 def cleaned(resource):
@@ -79,11 +78,14 @@ def update_resource(qvarn, _resource_type, *args, **kwargs):
     return updater
 
 
-def process(qvarn, listeners, config, limit=10):
+def process(qvarn, listeners, config_or_engine, limit=10):
+    if isinstance(config_or_engine, MapReduceEngine):
+        engine = config_or_engine
+    else:
+        engine = MapReduceEngine(qvarn, config_or_engine)
     counter = count()
     changes_processed = 1
-    mappers, reducers = get_handlers(config)
     while changes_processed > 0:
         changes = get_changes(qvarn, listeners)
-        changes_processed = process_changes(qvarn, config, changes, mappers, reducers)
+        changes_processed = engine.process_changes(changes)
         assert next(counter) < limit

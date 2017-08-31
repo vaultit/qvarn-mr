@@ -193,3 +193,39 @@ def test_check_and_update_listeners_state(pretender, qvarn, freezetime, mocker):
     assert get_resource_values(qvarn, 'qvarnmr_listeners', ('owner', 'timestamp')) == [
         ('hostname3/1', '2017-07-12T00:03:01.000000'),
     ]
+
+
+def test_check_and_update_listeners_state_changed_revision_case(pretender, qvarn, freezetime,
+                                                                mocker):
+    pretender.add_resource_types(SCHEMA)
+
+    config = {
+        'data__map': {
+            'data1': {'type': 'map'},
+        },
+    }
+
+    mocker.patch('socket.gethostname', return_value='hostname')
+    mocker.patch('os.getpid', return_value=1)
+
+    # Initial listeners discovery, <owner> and <timestamp> should not be set yet.
+    freezetime('2017-07-12 00:00:00')
+    listeners = get_or_create_listeners(qvarn, 'test', config)
+    listeners = check_and_update_listeners_state(qvarn, listeners, interval=10, timeout=60)
+    assert get_resource_values(qvarn, 'qvarnmr_listeners', ('owner', 'timestamp')) == [
+        ('hostname/1', '2017-07-12T00:00:00.000000'),
+    ]
+
+    # More than <timeout> time has passed, and state has been changed by another process.
+    freezetime('2017-07-12 00:01:10')
+    mocker.patch('os.getpid', return_value=2)
+    check_and_update_listeners_state(qvarn, listeners, interval=10, timeout=60)
+
+    freezetime('2017-07-12 00:01:30')
+    mocker.patch('os.getpid', return_value=1)
+    with pytest.raises(BusyListenerError) as e:
+        check_and_update_listeners_state(qvarn, listeners, interval=10, timeout=60)
+    assert str(e.value) == 'map/reduce engine is already running on hostname/2'
+    assert get_resource_values(qvarn, 'qvarnmr_listeners', ('owner', 'timestamp')) == [
+        ('hostname/2', '2017-07-12T00:01:10.000000'),
+    ]

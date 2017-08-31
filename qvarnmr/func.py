@@ -9,6 +9,15 @@ class Func:
         self.args = args
         self.kwargs = kwargs
 
+    def __repr__(self):
+        return (
+            self.func.__name__ + '(' +
+            ', '.join(
+                [repr(a) for a in self.args] +
+                ['%s=%r' % (k, v) for k, v in self.kwargs.items()]
+            ) + ')'
+        )
+
     def __call__(self, context, value):
         return self.func(context, value, *self.args, **self.kwargs)
 
