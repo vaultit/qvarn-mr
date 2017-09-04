@@ -16,8 +16,14 @@ Listener = namedtuple('Listener', ('source_resource_type', 'listener', 'state'))
 def get_or_create_listeners(qvarn, instance: str, config: dict):
     listeners = []
 
+    sources = set()
     for target_resource_type, handlers in config.items():
         for source_resource_type, handler in handlers.items():
+            # Make sure we have one listener, per source.
+            if source_resource_type in sources:
+                continue
+            sources.add(source_resource_type)
+
             state = qvarn.search_one(
                 'qvarnmr_listeners',
                 instance=instance,
@@ -81,8 +87,8 @@ def check_and_update_listeners_state(qvarn, listeners: list, interval: float=10,
         # If more than <timeout> time has passed, fetch state from Qvarn because it could be changed
         # by another process.
         if now - timestamp >= timeout:
-            logger.warn("refresh state resource timeout=%.2fs time=%.2fs",
-                        timeout.total_seconds(), (now - timestamp).total_seconds())
+            logger.warning("refresh state resource timeout=%.2fs time=%.2fs",
+                           timeout.total_seconds(), (now - timestamp).total_seconds())
             state = qvarn.get('qvarnmr_listeners', state['id'])
             timestamp = (now if state['timestamp'] is None else
                          datetime.datetime.strptime(state['timestamp'], DATETIME_FORMAT))

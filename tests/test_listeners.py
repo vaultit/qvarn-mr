@@ -124,6 +124,9 @@ def test_check_and_update_listeners_state(pretender, qvarn, freezetime, mocker):
         'data__map': {
             'data1': {'type': 'map'},
         },
+        'data2': {
+            'data1': {'type': 'map'},
+        }
     }
 
     mocker.patch('socket.gethostname', return_value='hostname')

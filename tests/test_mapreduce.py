@@ -1,6 +1,8 @@
+from functools import reduce
+from operator import itemgetter, mul
 from unittest import mock
 
-from qvarnmr.func import join, item, count, value
+from qvarnmr.func import join, item, count, value, mr_func
 from qvarnmr.testing.utils import cleaned, get_resource_values, get_reduced_data, process
 from qvarnmr.listeners import get_or_create_listeners
 
@@ -491,3 +493,172 @@ def test_map_outputs_dict_value(pretender, qvarn):
         '_mr_deleted': 0,
         'result': 16,
     }
+
+
+def test_single_source_multiple_targets(pretender, qvarn):
+    pretender.add_resource_types({
+        'source': {
+            'path': '/source',
+            'type': 'source',
+            'versions': [
+                {
+                    'version': 'v1',
+                    'prototype': {
+                        'id': '',
+                        'type': '',
+                        'revision': '',
+                        'key': '',
+                        'value': 0,
+                    },
+                },
+            ],
+        },
+        'map1': {
+            'path': '/map1',
+            'type': 'map1',
+            'versions': [
+                {
+                    'version': 'v1',
+                    'prototype': {
+                        'id': '',
+                        'type': '',
+                        'revision': '',
+                        '_mr_key': '',
+                        '_mr_value': 0,
+                        '_mr_source_id': '',
+                        '_mr_source_type': '',
+                        '_mr_version': 0,
+                        '_mr_deleted': False,
+                    },
+                },
+            ],
+        },
+        'map2': {
+            'path': '/map2',
+            'type': 'map2',
+            'versions': [
+                {
+                    'version': 'v1',
+                    'prototype': {
+                        'id': '',
+                        'type': '',
+                        'revision': '',
+                        '_mr_key': '',
+                        '_mr_value': 0,
+                        '_mr_source_id': '',
+                        '_mr_source_type': '',
+                        '_mr_version': 0,
+                        '_mr_deleted': False,
+                    },
+                },
+            ],
+        },
+        'reduce1': {
+            'path': '/reduce1',
+            'type': 'reduce1',
+            'versions': [
+                {
+                    'version': 'v1',
+                    'prototype': {
+                        'id': '',
+                        'type': '',
+                        'revision': '',
+                        '_mr_key': '',
+                        '_mr_value': 0,
+                        '_mr_version': 0,
+                    },
+                },
+            ],
+        },
+        'reduce2': {
+            'path': '/reduce2',
+            'type': 'reduce2',
+            'versions': [
+                {
+                    'version': 'v1',
+                    'prototype': {
+                        'id': '',
+                        'type': '',
+                        'revision': '',
+                        '_mr_key': '',
+                        '_mr_value': 0,
+                        '_mr_version': 0,
+                    },
+                },
+            ],
+        },
+    })
+
+    sum_reducer = mr_func()(lambda context, resources: sum(
+        resource['_mr_value']
+        for resource in context.qvarn.get_multiple(context.source_resource_type, resources)
+    ))
+
+    mul_reducer = mr_func()(lambda context, resources: reduce(mul, (
+        resource['_mr_value']
+        for resource in context.qvarn.get_multiple(context.source_resource_type, resources)
+    )))
+
+    config = {
+        'map1': {
+            'source': {
+                'type': 'map',
+                'version': 1,
+                'handler': item('key', 'value'),
+            },
+        },
+        'map2': {
+            'source': {
+                'type': 'map',
+                'version': 1,
+                'handler': item('key', 'value'),
+            },
+        },
+        'reduce1': {
+            'map1': {
+                'type': 'reduce',
+                'version': 1,
+                'handler': sum_reducer(),
+            },
+            'map2': {
+                'type': 'reduce',
+                'version': 1,
+                'handler': sum_reducer(),
+            },
+        },
+        'reduce2': {
+            'map1': {
+                'type': 'reduce',
+                'version': 1,
+                'handler': mul_reducer(),
+            },
+            'map2': {
+                'type': 'reduce',
+                'version': 1,
+                'handler': mul_reducer(),
+            },
+        },
+    }
+
+    listeners = get_or_create_listeners(qvarn, 'test', config)
+
+    qvarn.create('source', {'key': '1', 'value': 2}),
+    qvarn.create('source', {'key': '1', 'value': 4}),
+
+    process(qvarn, listeners, config)
+
+    assert get_resource_values(qvarn, 'map1', ('_mr_source_type', '_mr_key', '_mr_value')) == [
+        ('source', '1', 2),
+        ('source', '1', 4),
+    ]
+    assert get_resource_values(qvarn, 'map2', ('_mr_source_type', '_mr_key', '_mr_value')) == [
+        ('source', '1', 2),
+        ('source', '1', 4),
+    ]
+
+    assert get_resource_values(qvarn, 'reduce1', ('_mr_key', '_mr_value')) == [
+        ('1', 6),
+    ]
+    assert get_resource_values(qvarn, 'reduce2', ('_mr_key', '_mr_value')) == [
+        ('1', 8),
+    ]
