@@ -31,7 +31,7 @@ def get_reduced_data(qvarn, target, expect_n_resources=None):
     return result
 
 
-def get_resource_values(qvarn, target, field):
+def get_resource_values(qvarn, target, field, sort=None):
     result = []
     resources = qvarn.get_list(target)
     for r in qvarn.get_multiple(target, resources):
@@ -39,7 +39,7 @@ def get_resource_values(qvarn, target, field):
             result.append(tuple(r[x] for x in field))
         else:
             result.append(r[field])
-    return sorted(result)
+    return sorted(result, key=sort)
 
 
 def update_resource(qvarn, _resource_type, *args, **kwargs):

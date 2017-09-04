@@ -1,11 +1,6 @@
-qvarn-mr (1.1.4-1) jessie; urgency=medium
+qvarn-mr (1.1.5-1) jessie; urgency=medium
 
-    * Proper logging
+    * Keep alive checker uses correct listener if multiple listeners for same
+      resource are user
 
-    * Configurable keep alive parameters
-
-    * Keep alive updates after each handler processing
-
-    * Fix reduce full resync bug
-
- -- POV Team <tilaajavastuu@pov.lt>  Thu, 31 Aug 2017 10:30:00 +0300
+ -- POV Team <tilaajavastuu@pov.lt>  Thu, 4 Sep 2017 19:00:00 +0300

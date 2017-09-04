@@ -1,6 +1,14 @@
 Change History
 ==============
 
+0.1.5 (unreleased)
+------------------
+
+- Fixed one source for multiple targets bug, when listeners gave resource
+  conflict errors.
+
+- Replaced deprecated ``logger.warn`` to ``logger.warning``.
+
 0.1.4 (2017-08-31)
 ------------------
 
