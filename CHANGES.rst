@@ -1,7 +1,10 @@
 Change History
 ==============
 
-0.1.5 (unreleased)
+0.1.6 (unreleased)
+-----------------
+
+0.1.5 (2017-09-04)
 ------------------
 
 - Fixed one source for multiple targets bug, when listeners gave resource
