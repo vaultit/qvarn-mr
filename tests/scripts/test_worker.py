@@ -1,6 +1,8 @@
 from io import StringIO
 from copy import deepcopy
 
+import pytest
+
 from qvarnmr.scripts import worker
 from qvarnmr.func import item, value
 from qvarnmr.testing.utils import get_reduced_data, get_resource_values, update_resource
@@ -180,3 +182,29 @@ def test_check_for_running_workers(pretender, qvarn, mocker, config):
     update_resource(qvarn, 'qvarnmr_listeners', resource_type='source')(owner='host3')
     assert worker.main(['qvarnmr.testing.config', '-c', 'qvarnmr.cfg']) == 1
     assert output.getvalue() == 'map/reduce engine is already running on host3\n'
+
+
+def test_keyboard_interrupt(pretender, qvarn, mocker, config):
+    mocker.patch('qvarnmr.scripts.worker.set_config')
+    mocker.patch('qvarnmr.scripts.worker.setup_qvarn_client', return_value=qvarn.client)
+    mocker.patch('qvarnmr.testing.config', CONFIG, create=True)
+
+    pretender.add_resource_types(SCHEMA)
+
+    # Create several resources.
+    qvarn.create('source', {'key': 1, 'value': 1}),
+    qvarn.create('source', {'key': 1, 'value': 2}),
+    qvarn.create('source', {'key': 1, 'value': 3}),
+
+    from qvarnmr.listeners import check_and_update_listeners_state
+
+    def wrapped_check_and_update_listeners_state(*args, **kwargs):
+        check_and_update_listeners_state(*args, **kwargs)
+        raise KeyboardInterrupt
+
+    mocker.patch('qvarnmr.scripts.worker.check_and_update_listeners_state',
+                 wrapped_check_and_update_listeners_state)
+
+    # Run worker.
+    with pytest.raises(KeyboardInterrupt):
+        worker.main(['qvarnmr.testing.config', '-c', 'qvarnmr.cfg'])

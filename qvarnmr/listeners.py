@@ -141,8 +141,9 @@ def clear_listener_owners(qvarn, listeners: list):
     """
     result = []
     for listener in listeners:
-        state = qvarn.update('qvarnmr_listeners', listener.state['id'], dict(
-            listener.state,
+        state = qvarn.get('qvarnmr_listeners', listener.state['id'])
+        state = qvarn.update('qvarnmr_listeners', state['id'], dict(
+            state,
             owner=None,
             timestamp=datetime.datetime.utcnow().strftime(DATETIME_FORMAT),
         ))
