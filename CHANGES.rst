@@ -1,8 +1,22 @@
 Change History
 ==============
 
-0.1.6 (unreleased)
------------------
+0.1.7 (unreleased)
+------------------
+
+
+0.1.6 (2017-09-26)
+------------------
+
+- Fix issue, when reduce handler errors where not properly handled during full
+  resync.
+
+- qvarnmr.processed.process_map and _process_reduce functions became private
+  functions, while qvarnmr.processed.MapReduceEngine.process_reduce_handlers
+  became public, bicause it is used by resyncer.
+
+- Add logging for how many items where produced by map handler.
+
 
 0.1.5 (2017-09-04)
 ------------------
@@ -11,6 +25,7 @@ Change History
   conflict errors.
 
 - Replaced deprecated ``logger.warn`` to ``logger.warning``.
+
 
 0.1.4 (2017-08-31)
 ------------------
@@ -22,6 +37,7 @@ Change History
 - Keep alive updates after each handler processing
 
 - Fix reduce full resync bug
+
 
 0.1.3 (unreleased)
 ------------------
@@ -45,12 +61,14 @@ Change History
 - Configurable keep alive parameters using **keep_alive_update_interval** and
   **keep_alive_timeout** configuration file options.
 
+
 0.1.2 (2017-07-14)
 ------------------
 
 - Added checks to make sure that one worker is running. This required some
   schema changes, two fields ``owner`` and ``timestamp`` where added to
   ``qvarnmr_handlers`` resource type.
+
 
 0.1.1 (2017-06-27)
 ------------------
