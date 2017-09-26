@@ -87,7 +87,7 @@ def _save_reduce_result(qvarn, handler, resource, target_resource_type, key, val
         qvarn.update(target_resource_type, resource['id'], value)
 
 
-def process_map(qvarn, source_resource_type, resource_change, resource_id, handlers, resync=False):
+def _process_map(qvarn, source_resource_type, resource_change, resource_id, handlers, resync=False):
     resources_updated = 0
     context = Context(qvarn, source_resource_type)
     if resource_change in (CREATED, UPDATED):
@@ -111,14 +111,15 @@ def process_map(qvarn, source_resource_type, resource_change, resource_id, handl
             results = list(run(handler['handler'], context, resource))
 
             # We have to clean all existing resources produced by map handler previously, because we
-            # can't easily identify previously generated (key, value) pair with the new one.
+            # can't easily identify previously generated (key, value) pairs with the new ones.
             _clean_existing_resources(qvarn, target_resource_type, existing_resources)
             resources_updated += _save_map_results(qvarn, handler, resource, target_resource_type,
                                                    source_resource_type, results)
             logger.info('done processing map handler source=%s target=%s change=%s resource=%s '
-                        'handler=%r version=%s resync=%r time=%.2fs', source_resource_type,
-                        target_resource_type, resource_change, resource_id, handler['handler'],
-                        handler['version'], resync, time.time() - start)
+                        'handler=%r version=%s resync=%r output=%d time=%.2fs',
+                        source_resource_type, target_resource_type, resource_change, resource_id,
+                        handler['handler'], handler['version'], resync, len(results),
+                        time.time() - start)
 
     elif resource_change == DELETED:
         for target_resource_type, handler in handlers:
@@ -166,7 +167,7 @@ def _iter_reduce_resource_ids(qvarn, config, source_resource_type, key):
             yield resource['id']
 
 
-def process_reduce(qvarn, config, source_resource_type, key, handlers, resync=False):
+def _process_reduce(qvarn, config, source_resource_type, key, handlers, resync=False):
     context = Context(qvarn, source_resource_type)
     for target_resource_type, handler in handlers:
         logger.info('processing reduce handler source=%s target=%s key=%s handler=%r '
@@ -233,9 +234,9 @@ class MapReduceEngine:
         # reduce handlers for processing in groups in the next step.
         for notification in changes:
             try:
-                process_map(self.qvarn, notification.resource_type, notification.resource_change,
-                            notification.resource_id, self.mappers[notification.resource_type],
-                            resync)
+                _process_map(self.qvarn, notification.resource_type, notification.resource_change,
+                             notification.resource_id, self.mappers[notification.resource_type],
+                             resync)
 
             except Exception:
                 logger.exception("error while processing map handlers for %r", (
@@ -284,15 +285,15 @@ class MapReduceEngine:
 
         return changes_processed, reduce_changes
 
-    def _process_reduce_handlers(self, changes):
+    def process_reduce_handlers(self, changes, resync=False):
         changes_processed = 0
 
         # Process all changes with reduce handlers in groups.
         changes = sorted(changes, key=itemgetter(0))
         for (source_resource_type, key), group in groupby(changes, key=itemgetter(0)):
             try:
-                process_reduce(self.qvarn, self.config, source_resource_type, key,
-                               self.reducers[source_resource_type], resync=False)
+                _process_reduce(self.qvarn, self.config, source_resource_type, key,
+                                self.reducers[source_resource_type], resync=resync)
 
             except HandlerVersionError as e:
                 # If we end up here, it means, that this key has inconsistent versions in mapped
@@ -335,7 +336,7 @@ class MapReduceEngine:
         logger.info('processing changes resync=%r', resync)
         start = time.time()
         mapped, reduce_changes = self._process_map_handlers(changes, resync)
-        reduced = self._process_reduce_handlers(reduce_changes)
+        reduced = self.process_reduce_handlers(reduce_changes, resync)
         logger.info('done processing changes resync=%r mapped=%d reduced=%d time=%.2fs', resync,
                     mapped, reduced, time.time() - start)
         return mapped + reduced
