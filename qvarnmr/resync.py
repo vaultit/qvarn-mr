@@ -2,7 +2,7 @@ import time
 import logging
 
 from qvarnmr.clients.qvarn import QvarnApi
-from qvarnmr.processor import UPDATED, Notification, MapReduceEngine, process_reduce
+from qvarnmr.processor import UPDATED, Notification, MapReduceEngine
 from qvarnmr.utils import chunks
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,15 @@ def iter_reduce_resync_keys(qvarn: QvarnApi, source_resource_type: str):
     for resource in qvarn.search(source_resource_type, show=('_mr_key',)):
         key = resource['_mr_key']
         if key not in reduced_keys:
-            yield key
+            notification = Notification(
+                resource_type=source_resource_type,
+                resource_change=UPDATED,
+                resource_id=None,
+                notification_id=None,
+                listener_id=None,
+                generated=True,
+            )
+            yield (source_resource_type, key), notification
             reduced_keys.add(key)
 
 
@@ -101,10 +109,8 @@ def resync_changed_handlers(qvarn: QvarnApi, engine: MapReduceEngine, instance: 
                     source_resource_type, target_resource_type, handler['handler'],
                     handler['version'])
         start = time.time()
-        for keys in chunks(100, iter_reduce_resync_keys(qvarn, source_resource_type)):
-            for key in keys:
-                process_reduce(qvarn, engine.config, source_resource_type, key,
-                               [(target_resource_type, handler)], resync=True)
+        for changes in chunks(100, iter_reduce_resync_keys(qvarn, source_resource_type)):
+            engine.process_reduce_handlers(changes, resync=True)
             yield
         # Update handler version only when full resync is successfully done.
         update_handler_version(qvarn, instance, target_resource_type, source_resource_type,

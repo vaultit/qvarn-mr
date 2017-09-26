@@ -208,3 +208,50 @@ def test_keyboard_interrupt(pretender, qvarn, mocker, config):
     # Run worker.
     with pytest.raises(KeyboardInterrupt):
         worker.main(['qvarnmr.testing.config', '-c', 'qvarnmr.cfg'])
+
+
+def test_handler_error_during_resync(pretender, qvarn, mocker, config):
+    mocker.patch('qvarnmr.scripts.worker.set_config')
+    mocker.patch('qvarnmr.scripts.worker.setup_qvarn_client', return_value=qvarn.client)
+
+    pretender.add_resource_types(SCHEMA)
+
+    config_ = deepcopy(CONFIG)
+    mocker.patch('qvarnmr.testing.config', config_, create=True)
+
+    # Create several resources.
+    qvarn.create('source', {'key': 1, 'value': 1}),
+    qvarn.create('source', {'key': 1, 'value': 2}),
+    qvarn.create('source', {'key': 1, 'value': 3}),
+
+    # Run worker, it should do automatic synchronisation of all the data.
+    worker.main(['qvarnmr.testing.config', '-c', 'qvarnmr.cfg'])
+    reduced = get_reduced_data(qvarn, 'reduce_target', 1)
+    assert reduced[1]['_mr_value'] == 6
+
+    def new_map_handler(resource):
+        raise ValueError("Ups.")
+
+    # Change handler and version, that should be picked up by worker automatically and all data
+    # should be resynced with new handler.
+    config_['map_target']['source'] = {
+        'type': 'map',
+        'version': 2,
+        'handler': new_map_handler,
+    }
+    worker.main(['qvarnmr.testing.config', '-c', 'qvarnmr.cfg'])
+    reduced = get_reduced_data(qvarn, 'reduce_target', 1)
+    assert reduced[1]['_mr_value'] == 6
+
+    def new_reduce_handler(resources):
+        raise ValueError("Ups.")
+
+    # Lets try to change the reduce handler. Automatic resync should happen too.
+    config_['reduce_target']['map_target'] = {
+        'type': 'reduce',
+        'version': 2,
+        'handler': new_reduce_handler,
+    }
+    worker.main(['qvarnmr.testing.config', '-c', 'qvarnmr.cfg'])
+    reduced = get_reduced_data(qvarn, 'reduce_target', 1)
+    assert reduced[1]['_mr_value'] == 6

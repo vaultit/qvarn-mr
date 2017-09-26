@@ -1,5 +1,5 @@
 from qvarnmr.processor import UPDATED
-from qvarnmr.processor import process_map, MapReduceEngine
+from qvarnmr.processor import _process_map, MapReduceEngine
 from qvarnmr.func import item, value
 from qvarnmr.handlers import get_handlers
 from qvarnmr.listeners import get_or_create_listeners, check_and_update_listeners_state
@@ -90,7 +90,7 @@ def test_process_map_resync_samever(pretender, qvarn):
     # Process map handlers in resync mode, since map handler version matches the one already saved,
     # nothing should be done.
     mappers, reducers = get_handlers(config)
-    assert process_map(qvarn, 'source', UPDATED, data['id'], mappers['source'], resync=True) == 0
+    assert _process_map(qvarn, 'source', UPDATED, data['id'], mappers['source'], resync=True) == 0
 
     mapped = get_mapped_data(qvarn, 'map_target')
     assert mapped[data['id']] == {
