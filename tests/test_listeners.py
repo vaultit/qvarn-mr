@@ -4,6 +4,7 @@ from operator import itemgetter
 
 from qvarnmr.testing.utils import get_resource_values
 from qvarnmr.exceptions import BusyListenerError
+from qvarnmr.func import item, count
 from qvarnmr.listeners import (
     get_or_create_listeners,
     check_and_update_listeners_state,
@@ -70,11 +71,23 @@ def test_get_listeners(realqvarn, qvarn):
 
     config = {
         'data__map': {
-            'data1': {'type': 'map'},
-            'data2': {'type': 'map'},
+            'data1': {
+                'type': 'map',
+                'version': 1,
+                'handler': item('id'),
+            },
+            'data2': {
+                'type': 'map',
+                'version': 1,
+                'handler': item('id'),
+            },
         },
         'data__join': {
-            'data__map': {'type': 'reduce'},
+            'data__map': {
+                'type': 'reduce',
+                'version': 1,
+                'handler': count,
+            },
         },
     }
 
@@ -122,10 +135,18 @@ def test_check_and_update_listeners_state(realqvarn, qvarn, freezetime, mocker):
 
     config = {
         'data__map': {
-            'data1': {'type': 'map'},
+            'data1': {
+                'type': 'map',
+                'version': 1,
+                'handler': item('id'),
+            },
         },
         'data2': {
-            'data1': {'type': 'map'},
+            'data1': {
+                'type': 'map',
+                'version': 1,
+                'handler': item('id'),
+            },
         }
     }
 
@@ -204,7 +225,11 @@ def test_check_and_update_listeners_state_changed_revision_case(realqvarn, qvarn
 
     config = {
         'data__map': {
-            'data1': {'type': 'map'},
+            'data1': {
+                'type': 'map',
+                'version': 1,
+                'handler': item('id'),
+            },
         },
     }
 
