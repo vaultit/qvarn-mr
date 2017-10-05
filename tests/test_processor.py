@@ -56,6 +56,7 @@ SCHEMA = {
                     '_mr_key': '',
                     '_mr_value': 0,
                     '_mr_version': 0,
+                    '_mr_timestamp': 0,
                 },
             },
         ],
@@ -268,4 +269,38 @@ def test_callbacks(realqvarn, qvarn, mocker, freezetime):
     ]
     assert get_resource_values(qvarn, 'qvarnmr_listeners', ('owner', 'timestamp')) == [
         ('hostname/1', '2017-07-12T00:00:00.000000'),
+    ]
+
+
+def test_reduce_multiple_resources_for_signle_key(realqvarn, qvarn, mocker, freezetime):
+    realqvarn.add_resource_types(SCHEMA)
+
+    config = {
+        'map_target': {
+            'source': {
+                'type': 'map',
+                'version': 1,
+                'handler': item('key'),
+            },
+        },
+        'reduce_target': {
+            'map_target': {
+                'type': 'reduce',
+                'version': 1,
+                'handler': lambda x: len(list(x)),
+            },
+        },
+    }
+
+    engine = MapReduceEngine(qvarn, config, raise_errors=True)
+    listeners = get_or_create_listeners(qvarn, 'test', config)
+
+    qvarn.create('source', {'key': 'k1', 'value': 2}),
+    qvarn.create('reduce_target', {'_mr_key': 'k1'}),
+    qvarn.create('reduce_target', {'_mr_key': 'k1'}),
+
+    process(qvarn, listeners, engine)
+
+    assert get_resource_values(qvarn, 'reduce_target', ('_mr_key', '_mr_value')) == [
+        ('k1', 1),
     ]

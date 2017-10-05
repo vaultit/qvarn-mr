@@ -40,8 +40,7 @@ def _same_version(version, resources):
 
 
 def _clean_existing_resources(qvarn, target_resource_type, resources):
-    for resource in resources:
-        qvarn.delete(target_resource_type, resource['id'])
+    qvarn.delete_multiple(target_resource_type, [x['id'] for x in resources])
 
 
 def _save_map_results(qvarn, handler, resource, target_resource_type, source_resource_type,
@@ -79,6 +78,10 @@ def _save_reduce_result(qvarn, handler, resource, target_resource_type, key, val
 
     # Save handler version to be able to track outdated resources.
     value['_mr_version'] = handler['version']
+
+    # Timestamp in nanoseconds, Qvarn uses signed 8 bytes integer for storing numbers. So if we
+    # store timestamp in nanoseconds, we have enough space until ~2270 year.
+    value['_mr_timestamp'] = int(time.time() * 1e9)
 
     # Save reduced value to the target resource type.
     if resource is None:
@@ -162,9 +165,22 @@ def _iter_reduce_resource_ids(qvarn, config, source_resource_type, key):
     for resource in resources:
         if not resource['_mr_deleted']:
             map_handler = config[source_resource_type][resource['_mr_source_type']]
+            # We need to wait, while all source resources have same version and only then do the
+            # reduce part, when all data are consistent.
             if map_handler['version'] != resource['_mr_version']:
                 raise HandlerVersionError(key)
             yield resource['id']
+
+
+def _get_and_ensure_single_resource(qvarn, resource_type, key):
+    resources = qvarn.search(resource_type, _mr_key=key, show_all=True)
+
+    if len(resources) > 1:
+        resources = sorted(resources, key=lambda x: (x['_mr_timestamp'] or 0), reverse=True)
+        _clean_existing_resources(qvarn, resource_type, resources[1:])
+
+    if len(resources) > 0:
+        return resources[0]
 
 
 def _process_reduce(qvarn, config, source_resource_type, key, handlers, resync=False):
@@ -175,7 +191,7 @@ def _process_reduce(qvarn, config, source_resource_type, key, handlers, resync=F
                     handler['handler'], handler['version'], resync)
         start = time.time()
 
-        target_resource = qvarn.search_one(target_resource_type, _mr_key=key, default=None)
+        target_resource = _get_and_ensure_single_resource(qvarn, target_resource_type, key)
 
         if resync and target_resource and _same_version(handler['version'], [target_resource]):
             # If we are doning full resync, skip resources that are already resynced.
@@ -193,15 +209,16 @@ def _process_reduce(qvarn, config, source_resource_type, key, handlers, resync=F
         if target_resource and empty:
             # Delete key entry if there are no keys produced by map handlers.
             _clean_existing_resources(qvarn, target_resource_type, [target_resource])
-            continue
 
-        # Call reduce function for all resources matching key.
-        value = next(run(handler['handler'], context, resources), None)
-        _save_reduce_result(qvarn, handler, target_resource, target_resource_type, key, value)
+        else:
+            # Call reduce function for all resources matching key.
+            value = next(run(handler['handler'], context, resources), None)
+            _save_reduce_result(qvarn, handler, target_resource, target_resource_type, key, value)
 
-        logger.info('done processing reduce handler source=%s target=%s key=%s handler=%r '
-                    'version=%s resync=%r time=%.2fs', source_resource_type, target_resource_type,
-                    key, handler['handler'], handler['version'], resync, time.time() - start)
+            logger.info('done processing reduce handler source=%s target=%s key=%s handler=%r '
+                        'version=%s resync=%r time=%.2fs', source_resource_type,
+                        target_resource_type, key, handler['handler'], handler['version'], resync,
+                        time.time() - start)
 
 
 class MapReduceEngine:
@@ -210,15 +227,16 @@ class MapReduceEngine:
         'reduce_handler_processed',
     )
 
-    def __init__(self, qvarn, config):
+    def __init__(self, qvarn, config, raise_errors=False):
         self.qvarn = qvarn
         self.config = config
+        self.raise_errors = raise_errors
         self.mappers, self.reducers = get_handlers(config)
         self.callbacks = {event: [] for event in self.EVENTS}
         self.reduce_handler_sources = {
             source
-            for target, handlers in config.items()
-            for source, handler in handlers.items()
+            for target, sources in config.items()
+            for source, handler in sources.items()
             if handler['type'] == 'reduce'
         }
 
@@ -248,6 +266,9 @@ class MapReduceEngine:
                 # handler, there is no point retrying it. Once handler will be fixed, all his target
                 # resources will updated anyway.
                 _delete_notification(self.qvarn, notification)
+
+                if self.raise_errors:
+                    raise
 
             else:
                 should_reduce = (
@@ -313,6 +334,9 @@ class MapReduceEngine:
                 # resources will updated anyway.
                 for _, notification in group:
                     _delete_notification(self.qvarn, notification)
+
+                if self.raise_errors:
+                    raise
 
             else:
                 # Delete processed mapped resources if they where marked for deletion.

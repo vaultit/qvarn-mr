@@ -58,6 +58,7 @@ SCHEMA = {
                     '_mr_key': 0,
                     '_mr_value': 0,
                     '_mr_version': 0,
+                    '_mr_timestamp': 0,
                 },
             },
         ],

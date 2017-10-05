@@ -1,5 +1,7 @@
+import pytest
+
 from functools import reduce
-from operator import itemgetter, mul
+from operator import mul
 from unittest import mock
 
 from qvarnmr.func import join, item, count, value, mr_func
@@ -42,6 +44,7 @@ def test_mapreduce(realqvarn, qvarn):
                         '_mr_key': '',
                         '_mr_value': '',
                         '_mr_version': 0,
+                        '_mr_timestamp': 0,
                         'org_id': '',
                         'report_id': '',
                     },
@@ -168,6 +171,7 @@ def test_reduce_scalar_value(realqvarn, qvarn):
                         '_mr_key': '',
                         '_mr_value': 0,
                         '_mr_version': 0,
+                        '_mr_timestamp': 0,
                     },
                 },
             ],
@@ -264,6 +268,7 @@ def test_create_update_delete_flow(realqvarn, qvarn):
                         '_mr_key': 0,
                         '_mr_value': 0,
                         '_mr_version': 0,
+                        '_mr_timestamp': 0,
                     },
                 },
             ],
@@ -368,6 +373,7 @@ def test_reduce_handler_error(realqvarn, qvarn):
                         '_mr_key': 0,
                         '_mr_value': 0,
                         '_mr_version': 0,
+                        '_mr_timestamp': 0,
                     },
                 },
             ],
@@ -400,7 +406,7 @@ def test_reduce_handler_error(realqvarn, qvarn):
     qvarn.create('data', {'key': 1, 'value': 3}),
 
     # Try to process changes.
-    process(qvarn, listeners, config)
+    process(qvarn, listeners, config, raise_errors=False)
     assert get_resource_values(qvarn, 'data_mapped', ('_mr_key', '_mr_value')) == [
         (1, 1),
         (1, 2),
@@ -495,6 +501,7 @@ def test_map_outputs_dict_value(realqvarn, qvarn):
     }
 
 
+@pytest.mark.skip("multiple sources are not supported")
 def test_single_source_multiple_targets(realqvarn, qvarn):
     realqvarn.add_resource_types({
         'source': {
@@ -566,6 +573,7 @@ def test_single_source_multiple_targets(realqvarn, qvarn):
                         '_mr_key': '',
                         '_mr_value': 0,
                         '_mr_version': 0,
+                        '_mr_timestamp': 0,
                     },
                 },
             ],
@@ -583,6 +591,7 @@ def test_single_source_multiple_targets(realqvarn, qvarn):
                         '_mr_key': '',
                         '_mr_value': 0,
                         '_mr_version': 0,
+                        '_mr_timestamp': 0,
                     },
                 },
             ],
