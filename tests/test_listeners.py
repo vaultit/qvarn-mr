@@ -65,8 +65,8 @@ SCHEMA = {
 }
 
 
-def test_get_listeners(pretender, qvarn):
-    pretender.add_resource_types(SCHEMA)
+def test_get_listeners(realqvarn, qvarn):
+    realqvarn.add_resource_types(SCHEMA)
 
     config = {
         'data__map': {
@@ -117,8 +117,8 @@ def test_get_listeners(pretender, qvarn):
     assert len(qvarn.get_list('data2/listeners')) == 1
 
 
-def test_check_and_update_listeners_state(pretender, qvarn, freezetime, mocker):
-    pretender.add_resource_types(SCHEMA)
+def test_check_and_update_listeners_state(realqvarn, qvarn, freezetime, mocker):
+    realqvarn.add_resource_types(SCHEMA)
 
     config = {
         'data__map': {
@@ -198,9 +198,9 @@ def test_check_and_update_listeners_state(pretender, qvarn, freezetime, mocker):
     ]
 
 
-def test_check_and_update_listeners_state_changed_revision_case(pretender, qvarn, freezetime,
+def test_check_and_update_listeners_state_changed_revision_case(realqvarn, qvarn, freezetime,
                                                                 mocker):
-    pretender.add_resource_types(SCHEMA)
+    realqvarn.add_resource_types(SCHEMA)
 
     config = {
         'data__map': {

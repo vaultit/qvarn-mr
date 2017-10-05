@@ -83,11 +83,11 @@ CONFIG = {
 }
 
 
-def test_worker(pretender, qvarn, mocker, config):
+def test_worker(realqvarn, qvarn, mocker, config):
     mocker.patch('qvarnmr.scripts.worker.set_config')
     mocker.patch('qvarnmr.scripts.worker.setup_qvarn_client', return_value=qvarn.client)
 
-    pretender.add_resource_types(SCHEMA)
+    realqvarn.add_resource_types(SCHEMA)
 
     mocker.patch('qvarnmr.testing.config', CONFIG, create=True)
 
@@ -115,11 +115,11 @@ def test_worker(pretender, qvarn, mocker, config):
     assert get_resource_values(qvarn, 'reduce_target', ('_mr_key', '_mr_value')) == [(1, 4)]
 
 
-def test_auto_resync(pretender, qvarn, mocker, config):
+def test_auto_resync(realqvarn, qvarn, mocker, config):
     mocker.patch('qvarnmr.scripts.worker.set_config')
     mocker.patch('qvarnmr.scripts.worker.setup_qvarn_client', return_value=qvarn.client)
 
-    pretender.add_resource_types(SCHEMA)
+    realqvarn.add_resource_types(SCHEMA)
 
     config_ = deepcopy(CONFIG)
     mocker.patch('qvarnmr.testing.config', config_, create=True)
@@ -160,12 +160,12 @@ def test_auto_resync(pretender, qvarn, mocker, config):
     assert reduced[1]['_mr_value'] == 2
 
 
-def test_check_for_running_workers(pretender, qvarn, mocker, config):
+def test_check_for_running_workers(realqvarn, qvarn, mocker, config):
     mocker.patch('qvarnmr.scripts.worker.set_config')
     mocker.patch('qvarnmr.scripts.worker.setup_qvarn_client', return_value=qvarn.client)
     mocker.patch('qvarnmr.testing.config', CONFIG, create=True)
 
-    pretender.add_resource_types(SCHEMA)
+    realqvarn.add_resource_types(SCHEMA)
 
     # Run worker from host1, process all changes and quit.
     mocker.patch('socket.gethostname', return_value='host1')
@@ -184,12 +184,12 @@ def test_check_for_running_workers(pretender, qvarn, mocker, config):
     assert output.getvalue() == 'map/reduce engine is already running on host3\n'
 
 
-def test_keyboard_interrupt(pretender, qvarn, mocker, config):
+def test_keyboard_interrupt(realqvarn, qvarn, mocker, config):
     mocker.patch('qvarnmr.scripts.worker.set_config')
     mocker.patch('qvarnmr.scripts.worker.setup_qvarn_client', return_value=qvarn.client)
     mocker.patch('qvarnmr.testing.config', CONFIG, create=True)
 
-    pretender.add_resource_types(SCHEMA)
+    realqvarn.add_resource_types(SCHEMA)
 
     # Create several resources.
     qvarn.create('source', {'key': 1, 'value': 1}),
@@ -210,11 +210,11 @@ def test_keyboard_interrupt(pretender, qvarn, mocker, config):
         worker.main(['qvarnmr.testing.config', '-c', 'qvarnmr.cfg'])
 
 
-def test_handler_error_during_resync(pretender, qvarn, mocker, config):
+def test_handler_error_during_resync(realqvarn, qvarn, mocker, config):
     mocker.patch('qvarnmr.scripts.worker.set_config')
     mocker.patch('qvarnmr.scripts.worker.setup_qvarn_client', return_value=qvarn.client)
 
-    pretender.add_resource_types(SCHEMA)
+    realqvarn.add_resource_types(SCHEMA)
 
     config_ = deepcopy(CONFIG)
     mocker.patch('qvarnmr.testing.config', config_, create=True)

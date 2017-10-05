@@ -7,8 +7,8 @@ from qvarnmr.testing.utils import cleaned, get_resource_values, get_reduced_data
 from qvarnmr.listeners import get_or_create_listeners
 
 
-def test_mapreduce(pretender, qvarn):
-    pretender.add_resource_types({
+def test_mapreduce(realqvarn, qvarn):
+    realqvarn.add_resource_types({
         'company_reports__map': {
             'path': '/company_reports__map',
             'type': 'company_reports__map',
@@ -133,8 +133,8 @@ def test_mapreduce(pretender, qvarn):
     }
 
 
-def test_reduce_scalar_value(pretender, qvarn):
-    pretender.add_resource_types({
+def test_reduce_scalar_value(realqvarn, qvarn):
+    realqvarn.add_resource_types({
         'reports_counts__map': {
             'path': '/reports_counts__map',
             'type': 'reports_count__map',
@@ -213,8 +213,8 @@ def test_reduce_scalar_value(pretender, qvarn):
     }
 
 
-def test_create_update_delete_flow(pretender, qvarn):
-    pretender.add_resource_types({
+def test_create_update_delete_flow(realqvarn, qvarn):
+    realqvarn.add_resource_types({
         'data': {
             'path': '/data',
             'type': 'data',
@@ -317,8 +317,8 @@ def test_create_update_delete_flow(pretender, qvarn):
     assert reduced['_mr_value'] == 4 and reduced['_mr_key'] == 1
 
 
-def test_reduce_handler_error(pretender, qvarn):
-    pretender.add_resource_types({
+def test_reduce_handler_error(realqvarn, qvarn):
+    realqvarn.add_resource_types({
         'data': {
             'path': '/data',
             'type': 'data',
@@ -417,8 +417,8 @@ def test_reduce_handler_error(pretender, qvarn):
                               '/notifications')) == 0
 
 
-def test_map_outputs_dict_value(pretender, qvarn):
-    pretender.add_resource_types({
+def test_map_outputs_dict_value(realqvarn, qvarn):
+    realqvarn.add_resource_types({
         'data': {
             'path': '/data',
             'type': 'data',
@@ -495,8 +495,8 @@ def test_map_outputs_dict_value(pretender, qvarn):
     }
 
 
-def test_single_source_multiple_targets(pretender, qvarn):
-    pretender.add_resource_types({
+def test_single_source_multiple_targets(realqvarn, qvarn):
+    realqvarn.add_resource_types({
         'source': {
             'path': '/source',
             'type': 'source',

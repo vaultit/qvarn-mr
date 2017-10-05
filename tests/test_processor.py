@@ -63,8 +63,8 @@ SCHEMA = {
 }
 
 
-def test_process_map_resync_samever(pretender, qvarn):
-    pretender.add_resource_types(SCHEMA)
+def test_process_map_resync_samever(realqvarn, qvarn):
+    realqvarn.add_resource_types(SCHEMA)
 
     config = {
         'map_target': {
@@ -104,8 +104,8 @@ def test_process_map_resync_samever(pretender, qvarn):
     }
 
 
-def test_delete_reduce_key_if_source_is_empty(pretender, qvarn):
-    pretender.add_resource_types(SCHEMA)
+def test_delete_reduce_key_if_source_is_empty(realqvarn, qvarn):
+    realqvarn.add_resource_types(SCHEMA)
 
     def reduce_handler(resources):
         resources = qvarn.get_multiple('map_target', resources)
@@ -156,8 +156,8 @@ def test_delete_reduce_key_if_source_is_empty(pretender, qvarn):
     assert get_resource_values(qvarn, 'reduce_target', '_mr_value') == []
 
 
-def test_reduce_half_synced_key(pretender, qvarn):
-    pretender.add_resource_types(SCHEMA)
+def test_reduce_half_synced_key(realqvarn, qvarn):
+    realqvarn.add_resource_types(SCHEMA)
 
     config = {
         'map_target': {
@@ -231,8 +231,8 @@ def test_reduce_half_synced_key(pretender, qvarn):
     ]
 
 
-def test_callbacks(pretender, qvarn, mocker, freezetime):
-    pretender.add_resource_types(SCHEMA)
+def test_callbacks(realqvarn, qvarn, mocker, freezetime):
+    realqvarn.add_resource_types(SCHEMA)
 
     mocker.patch('socket.gethostname', return_value='hostname')
     mocker.patch('os.getpid', return_value=1)

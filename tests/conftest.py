@@ -6,7 +6,7 @@ import dateutil.parser
 from freezegun.api import FakeDatetime, FakeDate, FrozenDateTimeFactory, convert_to_timezone_naive
 
 import qvarnmr.config
-from qvarnmr.testing.pretenderqvarn import PretenderQvarn
+from qvarnmr.testing.realqvarn import RealQvarn
 
 QVARN_BASE_URL = 'https://qvarn-example.tld'
 
@@ -31,13 +31,13 @@ def mock_requests():
 
 
 @pytest.fixture
-def pretender(request, mock_requests, mocker):
-    return PretenderQvarn(mock_requests, QVARN_BASE_URL)
+def realqvarn(request, mock_requests, mocker):
+    return RealQvarn(mock_requests, QVARN_BASE_URL)
 
 
 @pytest.fixture
-def qvarn(pretender):
-    return pretender.qvarn
+def qvarn(realqvarn):
+    return realqvarn.qvarn
 
 
 @pytest.fixture
