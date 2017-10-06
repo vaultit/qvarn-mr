@@ -1,6 +1,6 @@
-.PHONY: install
-install:
-	pip install -f vendor -r requirements-dev.txt -e . 
+.PHONY: env
+env: env/.done 
+
 
 .PHONY: help
 help:
@@ -13,20 +13,30 @@ help:
 
 
 .PHONY: test
-test:
-	py.test --cov-report=term-missing --cov=qvarnmr tests
+test: env
+	env/bin/py.test --cov-report=term-missing --cov=qvarnmr tests
 
 
 .PHONY: requirements
 requirements:
-	pip-compile -f vendor/ requirements/prod.in -o requirements.txt
-	pip-compile -f vendor/ requirements/prod.in requirements/dev.in -o requirements-dev.txt
+	env/bin/pip-compile -f vendor/ requirements/prod.in -o requirements.txt
+	env/bin/pip-compile -f vendor/ requirements/prod.in requirements/dev.in -o requirements-dev.txt
 
 
 .PHONY: update-requirements
-update-requirements: environ
-	pip install -U pip setuptools wheel
-	pip install -U -r requirements/prod.in
-	pip install -U -r requirements/dev.in
-	pip-compile -f vendor/ requirements/prod.in -o requirements.txt
-	pip-compile -f vendor/ requirements/prod.in requirements/dev.in -o requirements-dev.txt
+update-requirements: env
+	env/bin/pip install -U pip setuptools wheel
+	env/bin/pip install -U -r requirements/prod.in
+	env/bin/pip install -U -r requirements/dev.in
+	env/bin/pip-compile -f vendor/ requirements/prod.in -o requirements.txt
+	env/bin/pip-compile -f vendor/ requirements/prod.in requirements/dev.in -o requirements-dev.txt
+
+
+env/bin/pip:
+	virtualenv -p python3.4 env
+	env/bin/pip install -U pip setuptools wheel
+	env/bin/pip install -I setuptools   # workaround for https://github.com/pypa/setuptools/issues/887
+
+env/.done: env/bin/pip requirements-dev.txt setup.py
+	env/bin/pip install -f vendor/ -r requirements-dev.txt -e .
+	touch env/.done

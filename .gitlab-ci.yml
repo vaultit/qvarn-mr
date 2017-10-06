@@ -21,7 +21,6 @@ tests:
   variables:
     PIP_CACHE_DIR: .pip-cache/
   script:
-    - pip install -r requirements-dev.txt
     - make test
 
 debian_package:
