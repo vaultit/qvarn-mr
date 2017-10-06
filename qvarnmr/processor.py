@@ -25,6 +25,11 @@ Notification = namedtuple('Notification', [
                   # is no point to delete it.
 ])
 
+FailedNotification = namedtuple('FailedNotification', Notification._fields + (
+    'retries',
+    'processed_at',
+))
+
 Context = namedtuple('Context', [
     'qvarn',
     'source_resource_type',
@@ -240,12 +245,66 @@ class MapReduceEngine:
             if handler['type'] == 'reduce'
         }
 
+        self._failed_notifications = {}
+
     def _run_callbacks(self, event):
         for callback in self.callbacks[event]:
             callback()
 
+    def _report_success(self, notifications):
+        for notification in notifications:
+            if notification.notification_id in self._failed_notifications:
+                del self._failed_notifications[notification.notification_id]
+            _delete_notification(self.qvarn, notification)
+
+    def _report_error(self, notifications):
+        for notification in notifications:
+            key = notification.notification_id
+            error = self._failed_notifications.get(key, None)
+            if error is None:
+                self._failed_notifications[key] = FailedNotification(**dict(
+                    notification._asdict(),
+                    retries=0,
+                    processed_at=time.time(),
+                ))
+            else:
+                if error.retries > 1:
+                    del self._failed_notifications[key]
+                    _delete_notification(self.qvarn, notification)
+                else:
+                    self._failed_notifications[key] = FailedNotification(**dict(
+                        notification._asdict(),
+                        retries=error.retries + 1,
+                        processed_at=error.processed_at,
+                    ))
+
+    def _iter_changes(self, changes):
+        for notification in changes:
+
+            # Retry failed notifications.
+            if notification.notification_id in self._failed_notifications:
+                now = time.time()
+                notification = self._failed_notifications[notification.notification_id]
+                if notification.retries == 0 and now - notification.processed_at < 0.25:
+                    logger.debug('retry 0.25 (skip): %s', now - notification.processed_at)
+                    continue
+                elif notification.retries == 1 and now - notification.processed_at < 1.5:
+                    logger.debug('retry 1.5 (skip): %s', now - notification.processed_at)
+                    continue
+                elif notification.retries > 1:
+                    logger.debug('retry > 1 (abort)')
+                    del self._failed_notifications[notification.notification_id]
+                    _delete_notification(self.qvarn, notification)
+                    continue
+                logger.debug("retrying failed notification, resource: %s id: %s, retry: %s "
+                             "delay: %s", notification.resource_type, notification.resource_id,
+                             notification.retries, now - notification.processed_at)
+
+            yield notification
+
     def _process_map_handlers(self, changes, resync=False):
         changes_processed = 0
+        errors = 0
         reduce_changes = []
 
         # Run through all changes, process map handlers immediately and collect changes that have
@@ -257,16 +316,14 @@ class MapReduceEngine:
                              resync)
 
             except Exception:
+                # XXX: probably errors should be handler inside _process_map and another
+                #      exception could be rerised with information about which handler failed.
                 logger.exception("error while processing map handlers for %r", (
                     notification.resource_type, notification.resource_change,
                     notification.resource_id,
                 ))
-
-                # Delete notifications even if handler raised exception. If there is an error in
-                # handler, there is no point retrying it. Once handler will be fixed, all his target
-                # resources will updated anyway.
-                _delete_notification(self.qvarn, notification)
-
+                self._report_error([notification])
+                errors += 1
                 if self.raise_errors:
                     raise
 
@@ -285,28 +342,26 @@ class MapReduceEngine:
                                                      id=notification.resource_id,
                                                      show=('_mr_key',), default=None)
                     if resource is None:
-                        # It is very unlikely that we are going to end up here, but lets be sure.
-                        logger.error("resource %s of type %s was deleted.",
-                                     notification.resource_id, notification.resource_type)
-                        # If for some unknown reasons resource was deleted, then we can't get the
-                        # key, and without key, we can't call reduce handler. If this warning ever
-                        # happens situations should be investigated and fixed.
-                        _delete_notification(self.qvarn, notification)
-                        changes_processed += 1
+                        logger.warning(
+                            "can't find resource (%s, %s) specifiend in notificaton, the resource "
+                            "could be deleted or not yet replicated", notification.resource_type,
+                            notification.resource_id)
+                        self._report_error([notification])
+                        errors += 1
                     else:
                         # Collect all changes that have reduce handlers and process them later,
                         # grouped by key. This will lower number of reduce handler calls.
                         reduce_changes.append(((notification.resource_type, resource['_mr_key']),
                                                notification))
                 else:
-                    _delete_notification(self.qvarn, notification)
+                    self._report_success([notification])
                     changes_processed += 1
 
             self._run_callbacks('map_handler_processed')
 
-        return changes_processed, reduce_changes
+        return changes_processed, errors, reduce_changes
 
-    def process_reduce_handlers(self, changes, resync=False):
+    def process_reduce_handlers(self, changes, *, errors=0, resync=False):
         changes_processed = 0
 
         # Process all changes with reduce handlers in groups.
@@ -321,20 +376,16 @@ class MapReduceEngine:
                 # resources. In that case we postpone notification by leaving undeleted.
                 logger.debug("incompatible mapped resource versions for key=%r of %r resource.",
                              e.key, source_resource_type)
-
-                # TODO: update all outdated reduce source resources, because otherwise reduce will
-                #       have to wait until whole resync process is done.
+                self._report_error([notification for _, notification in group])
 
             except Exception:
+                # XXX: probably errors should be handler inside _process_reduce and another
+                #      exception could be rerised with information about which handler failed.
                 logger.exception("error while processing reduce handlers for %r, key=%r",
                                  source_resource_type, key)
-
-                # Delete notifications even if handler raised exception. If there is an error in
-                # handler, there is no point retrying it. Once handler will be fixed, all his target
-                # resources will updated anyway.
-                for _, notification in group:
-                    _delete_notification(self.qvarn, notification)
-
+                notifications = [notification for _, notification in group]
+                self._report_error(notifications)
+                errors += len(notifications)
                 if self.raise_errors:
                     raise
 
@@ -344,14 +395,13 @@ class MapReduceEngine:
                                                      _mr_deleted=True):
                     self.qvarn.delete(source_resource_type, resource_id)
 
-                # Delete processed notifications.
-                for _, notification in group:
-                    _delete_notification(self.qvarn, notification)
-                    changes_processed += 1
+                notifications = [notification for _, notification in group]
+                self._report_success(notifications)
+                changes_processed += len(notifications)
 
             self._run_callbacks('reduce_handler_processed')
 
-        return changes_processed
+        return changes_processed, errors
 
     def add_callback(self, event, callback):
         self.callbacks[event].append(callback)
@@ -359,10 +409,11 @@ class MapReduceEngine:
     def process_changes(self, changes, resync=False):
         logger.info('processing changes resync=%r', resync)
         start = time.time()
-        mapped, reduce_changes = self._process_map_handlers(changes, resync)
-        reduced = self.process_reduce_handlers(reduce_changes, resync)
-        logger.info('done processing changes resync=%r mapped=%d reduced=%d time=%.2fs', resync,
-                    mapped, reduced, time.time() - start)
+        changes = self._iter_changes(changes)
+        mapped, errors, reduce_changes = self._process_map_handlers(changes, resync)
+        reduced, errors = self.process_reduce_handlers(reduce_changes, errors=errors, resync=resync)
+        logger.info('done processing changes resync=%r mapped=%d reduced=%d errors=%d '
+                    'time=%.2fs', resync, mapped, reduced, errors, time.time() - start)
         return mapped + reduced
 
 

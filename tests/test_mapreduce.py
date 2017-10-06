@@ -7,6 +7,65 @@ from unittest import mock
 from qvarnmr.func import join, item, count, value, mr_func
 from qvarnmr.testing.utils import cleaned, get_resource_values, get_reduced_data, process
 from qvarnmr.listeners import get_or_create_listeners
+from qvarnmr.processor import MapReduceEngine
+
+
+SCHEMA = {
+    'source': {
+        'path': '/source',
+        'type': 'source',
+        'versions': [
+            {
+                'version': 'v1',
+                'prototype': {
+                    'id': '',
+                    'type': '',
+                    'revision': '',
+                    'key': 0,
+                    'value': 0,
+                },
+            },
+        ],
+    },
+    'mapped': {
+        'path': '/mapped',
+        'type': 'mapped',
+        'versions': [
+            {
+                'version': 'v1',
+                'prototype': {
+                    'id': '',
+                    'type': '',
+                    'revision': '',
+                    '_mr_key': 0,
+                    '_mr_value': 0,
+                    '_mr_source_id': '',
+                    '_mr_source_type': '',
+                    '_mr_version': 0,
+                    '_mr_deleted': 0,
+                },
+            },
+        ],
+    },
+    'reduced': {
+        'path': '/reduced',
+        'type': 'reduced',
+        'versions': [
+            {
+                'version': 'v1',
+                'prototype': {
+                    'id': '',
+                    'type': '',
+                    'revision': '',
+                    '_mr_key': 0,
+                    '_mr_value': 0,
+                    '_mr_version': 0,
+                    '_mr_timestamp': 0,
+                },
+            },
+        ],
+    },
+}
 
 
 def test_mapreduce(realqvarn, qvarn):
@@ -322,105 +381,120 @@ def test_create_update_delete_flow(realqvarn, qvarn):
     assert reduced['_mr_value'] == 4 and reduced['_mr_key'] == 1
 
 
-def test_reduce_handler_error(realqvarn, qvarn):
-    realqvarn.add_resource_types({
-        'data': {
-            'path': '/data',
-            'type': 'data',
-            'versions': [
-                {
-                    'version': 'v1',
-                    'prototype': {
-                        'id': '',
-                        'type': '',
-                        'revision': '',
-                        'key': 0,
-                        'value': 0,
-                    },
-                },
-            ],
-        },
-        'data_mapped': {
-            'path': '/data_mapped',
-            'type': 'data_mapped',
-            'versions': [
-                {
-                    'version': 'v1',
-                    'prototype': {
-                        'id': '',
-                        'type': '',
-                        'revision': '',
-                        '_mr_key': 0,
-                        '_mr_value': 0,
-                        '_mr_source_id': '',
-                        '_mr_source_type': '',
-                        '_mr_version': 0,
-                        '_mr_deleted': 0,
-                    },
-                },
-            ],
-        },
-        'data_reduced': {
-            'path': '/data_reduced',
-            'type': 'data_reduced',
-            'versions': [
-                {
-                    'version': 'v1',
-                    'prototype': {
-                        'id': '',
-                        'type': '',
-                        'revision': '',
-                        '_mr_key': 0,
-                        '_mr_value': 0,
-                        '_mr_version': 0,
-                        '_mr_timestamp': 0,
-                    },
-                },
-            ],
-        },
-    })
+def test_mapper_handler_error(realqvarn, qvarn, mocker):
+    realqvarn.add_resource_types(SCHEMA)
 
     config = {
-        'data_mapped': {
-            'data': {
+        'mapped': {
+            'source': {
+                'type': 'map',
+                'version': 1,
+                'handler': mock.Mock(side_effect=[
+                    iter([(1, 1)]),
+                    ValueError('fake error 1'),
+                    iter([(1, 3)]),
+                    ValueError('fake error 2'),
+                    iter([(1, 2)]),
+                ]),
+            },
+        },
+    }
+
+    import logging
+    logger = logging.getLogger('test')
+
+    engine = MapReduceEngine(qvarn, config)
+
+    listeners = get_or_create_listeners(qvarn, 'test', config)
+    listenerid = {x.source_resource_type: x.listener['id'] for x in listeners}
+
+    qvarn.create('source', {'key': 1, 'value': 1}),
+    qvarn.create('source', {'key': 1, 'value': 2}),
+    qvarn.create('source', {'key': 1, 'value': 3}),
+
+    # Handler should fail first time, but should pass the second time after retry.
+    logger.info('RUN: 1')
+    mocker.patch('time.time', return_value=1.0)
+    process(qvarn, listeners, engine, raise_errors=False)
+    assert get_resource_values(qvarn, 'mapped', ('_mr_key', '_mr_value')) == [
+        (1, 1),
+        (1, 3),
+    ]
+    assert len(qvarn.get_list('source/listeners/' + listenerid['source'] + '/notifications')) == 1
+
+    # Handler should be retried only after 0.25 seconds, not sooner.
+    logger.info('RUN: 2')
+    mocker.patch('time.time', return_value=2.0)
+    process(qvarn, listeners, engine, raise_errors=False)
+    assert get_resource_values(qvarn, 'mapped', ('_mr_key', '_mr_value')) == [
+        (1, 1),
+        (1, 3),
+    ]
+    assert len(qvarn.get_list('source/listeners/' + listenerid['source'] + '/notifications')) == 1
+
+    # Now enough time has passed, and handler should be retried.
+    logger.info('RUN: 3')
+    mocker.patch('time.time', return_value=3.0)
+    process(qvarn, listeners, engine, raise_errors=False)
+    assert get_resource_values(qvarn, 'mapped', ('_mr_key', '_mr_value')) == [
+        (1, 1),
+        (1, 2),
+        (1, 3),
+    ]
+    assert len(qvarn.get_list('source/listeners/' + listenerid['source'] + '/notifications')) == 0
+
+
+def test_reduce_handler_error(realqvarn, qvarn, mocker):
+    realqvarn.add_resource_types(SCHEMA)
+
+    config = {
+        'mapped': {
+            'source': {
                 'type': 'map',
                 'version': 1,
                 'handler': item('key', 'value'),
             },
         },
-        'data_reduced': {
-            'data_mapped': {
+        'reduced': {
+            'mapped': {
                 'type': 'reduce',
                 'version': 1,
-                'handler': sum,
-                'map': mock.Mock(side_effect=ValueError('imitated reduce error')),
+                'handler': mock.Mock(side_effect=[ValueError('fake error'), 42]),
             },
         },
     }
 
+    engine = MapReduceEngine(qvarn, config)
+
     listeners = get_or_create_listeners(qvarn, 'test', config)
+    listenerid = {x.source_resource_type: x.listener['id'] for x in listeners}
 
-    # Create several resources.
-    qvarn.create('data', {'key': 1, 'value': 1}),
-    qvarn.create('data', {'key': 1, 'value': 2}),
-    qvarn.create('data', {'key': 1, 'value': 3}),
+    qvarn.create('source', {'key': 1, 'value': 1}),
+    qvarn.create('source', {'key': 1, 'value': 2}),
+    qvarn.create('source', {'key': 1, 'value': 3}),
 
-    # Try to process changes.
-    process(qvarn, listeners, config, raise_errors=False)
-    assert get_resource_values(qvarn, 'data_mapped', ('_mr_key', '_mr_value')) == [
-        (1, 1),
-        (1, 2),
-        (1, 3),
+    # Handler should fail first time, but should pass the second time after retry.
+    mocker.patch('time.time', return_value=1.0)
+    process(qvarn, listeners, engine, raise_errors=False)
+    assert get_resource_values(qvarn, 'reduced', ('_mr_key', '_mr_value')) == []
+    assert len(qvarn.get_list('source/listeners/' + listenerid['source'] + '/notifications')) == 0
+    assert len(qvarn.get_list('mapped/listeners/' + listenerid['mapped'] + '/notifications')) == 3
+
+    # Handler should be retried only after 0.25 seconds, not sooner.
+    mocker.patch('time.time', return_value=1.1)
+    process(qvarn, listeners, engine, raise_errors=False)
+    assert get_resource_values(qvarn, 'reduced', ('_mr_key', '_mr_value')) == []
+    assert len(qvarn.get_list('source/listeners/' + listenerid['source'] + '/notifications')) == 0
+    assert len(qvarn.get_list('mapped/listeners/' + listenerid['mapped'] + '/notifications')) == 3
+
+    # Now enough time has passed, and handler should be retried.
+    mocker.patch('time.time', return_value=2.0)
+    process(qvarn, listeners, engine, raise_errors=False)
+    assert get_resource_values(qvarn, 'reduced', ('_mr_key', '_mr_value')) == [
+        (1, 42),
     ]
-
-    # Since reducer failed, all notifications should be left in queue.
-    listeners = {
-        listener.source_resource_type: listener.listener
-        for listener in get_or_create_listeners(qvarn, 'test', config)
-    }
-    assert len(qvarn.get_list('data/listeners/' + listeners['data']['id'] + '/notifications')) == 0
-    assert len(qvarn.get_list('data_mapped/listeners/' + listeners['data_mapped']['id'] +
-                              '/notifications')) == 0
+    assert len(qvarn.get_list('source/listeners/' + listenerid['source'] + '/notifications')) == 0
+    assert len(qvarn.get_list('mapped/listeners/' + listenerid['mapped'] + '/notifications')) == 0
 
 
 def test_map_outputs_dict_value(realqvarn, qvarn):
