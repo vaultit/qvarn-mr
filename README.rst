@@ -1,3 +1,10 @@
+.. image:: https://git.vaultit.org/common/qvarn-mr/badges/master/build.svg
+   :target: https://git.vaultit.org/common/qvarn-mr/commits/master
+
+.. image:: https://git.vaultit.org/common/qvarn-mr/badges/master/coverage.svg
+   :target: https://git.vaultit.org/common/qvarn-mr/commits/master
+
+
 Experimental Qvarn map/reduce service
 #####################################
 
