@@ -454,7 +454,7 @@ RESOURCE_TYPES = {
 }
 
 
-class PretenderQvarn:
+class RealQvarn:
 
     def __init__(self, requests, base_url, migrate=True, **qvarnapi_opts):
         self.requests = requests
@@ -486,6 +486,7 @@ class PretenderQvarn:
         self.db.executescript(dump)
 
     def init_routes(self):
+        import qvarn
 
         # Authentication
         self.requests.post('/auth/token', json={
@@ -499,10 +500,10 @@ class PretenderQvarn:
             'content-type': 'application/json',
         }, json={
             "api": {
-                "version": "0.74",
+                "version": qvarn.__version__,
             },
             "implementation": {
-                "name": "PretenderQvarn",
+                "name": "RealQvarn",
                 "version": "1.0",
             },
         })

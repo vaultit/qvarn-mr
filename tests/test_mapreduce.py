@@ -1,5 +1,7 @@
+import pytest
+
 from functools import reduce
-from operator import itemgetter, mul
+from operator import mul
 from unittest import mock
 
 from qvarnmr.func import join, item, count, value, mr_func
@@ -7,8 +9,8 @@ from qvarnmr.testing.utils import cleaned, get_resource_values, get_reduced_data
 from qvarnmr.listeners import get_or_create_listeners
 
 
-def test_mapreduce(pretender, qvarn):
-    pretender.add_resource_types({
+def test_mapreduce(realqvarn, qvarn):
+    realqvarn.add_resource_types({
         'company_reports__map': {
             'path': '/company_reports__map',
             'type': 'company_reports__map',
@@ -42,6 +44,7 @@ def test_mapreduce(pretender, qvarn):
                         '_mr_key': '',
                         '_mr_value': '',
                         '_mr_version': 0,
+                        '_mr_timestamp': 0,
                         'org_id': '',
                         'report_id': '',
                     },
@@ -133,8 +136,8 @@ def test_mapreduce(pretender, qvarn):
     }
 
 
-def test_reduce_scalar_value(pretender, qvarn):
-    pretender.add_resource_types({
+def test_reduce_scalar_value(realqvarn, qvarn):
+    realqvarn.add_resource_types({
         'reports_counts__map': {
             'path': '/reports_counts__map',
             'type': 'reports_count__map',
@@ -168,6 +171,7 @@ def test_reduce_scalar_value(pretender, qvarn):
                         '_mr_key': '',
                         '_mr_value': 0,
                         '_mr_version': 0,
+                        '_mr_timestamp': 0,
                     },
                 },
             ],
@@ -213,8 +217,8 @@ def test_reduce_scalar_value(pretender, qvarn):
     }
 
 
-def test_create_update_delete_flow(pretender, qvarn):
-    pretender.add_resource_types({
+def test_create_update_delete_flow(realqvarn, qvarn):
+    realqvarn.add_resource_types({
         'data': {
             'path': '/data',
             'type': 'data',
@@ -264,6 +268,7 @@ def test_create_update_delete_flow(pretender, qvarn):
                         '_mr_key': 0,
                         '_mr_value': 0,
                         '_mr_version': 0,
+                        '_mr_timestamp': 0,
                     },
                 },
             ],
@@ -317,8 +322,8 @@ def test_create_update_delete_flow(pretender, qvarn):
     assert reduced['_mr_value'] == 4 and reduced['_mr_key'] == 1
 
 
-def test_reduce_handler_error(pretender, qvarn):
-    pretender.add_resource_types({
+def test_reduce_handler_error(realqvarn, qvarn):
+    realqvarn.add_resource_types({
         'data': {
             'path': '/data',
             'type': 'data',
@@ -368,6 +373,7 @@ def test_reduce_handler_error(pretender, qvarn):
                         '_mr_key': 0,
                         '_mr_value': 0,
                         '_mr_version': 0,
+                        '_mr_timestamp': 0,
                     },
                 },
             ],
@@ -400,7 +406,7 @@ def test_reduce_handler_error(pretender, qvarn):
     qvarn.create('data', {'key': 1, 'value': 3}),
 
     # Try to process changes.
-    process(qvarn, listeners, config)
+    process(qvarn, listeners, config, raise_errors=False)
     assert get_resource_values(qvarn, 'data_mapped', ('_mr_key', '_mr_value')) == [
         (1, 1),
         (1, 2),
@@ -417,8 +423,8 @@ def test_reduce_handler_error(pretender, qvarn):
                               '/notifications')) == 0
 
 
-def test_map_outputs_dict_value(pretender, qvarn):
-    pretender.add_resource_types({
+def test_map_outputs_dict_value(realqvarn, qvarn):
+    realqvarn.add_resource_types({
         'data': {
             'path': '/data',
             'type': 'data',
@@ -495,8 +501,9 @@ def test_map_outputs_dict_value(pretender, qvarn):
     }
 
 
-def test_single_source_multiple_targets(pretender, qvarn):
-    pretender.add_resource_types({
+@pytest.mark.skip("multiple sources are not supported")
+def test_single_source_multiple_targets(realqvarn, qvarn):
+    realqvarn.add_resource_types({
         'source': {
             'path': '/source',
             'type': 'source',
@@ -566,6 +573,7 @@ def test_single_source_multiple_targets(pretender, qvarn):
                         '_mr_key': '',
                         '_mr_value': 0,
                         '_mr_version': 0,
+                        '_mr_timestamp': 0,
                     },
                 },
             ],
@@ -583,6 +591,7 @@ def test_single_source_multiple_targets(pretender, qvarn):
                         '_mr_key': '',
                         '_mr_value': 0,
                         '_mr_version': 0,
+                        '_mr_timestamp': 0,
                     },
                 },
             ],

@@ -4,6 +4,23 @@ Change History
 0.1.7 (unreleased)
 ------------------
 
+- Added proper handler of duplicates for reduced resources, where single key
+  could have more than one resource. Now newsest resource is used and all other
+  duplicatesa re automatically removed.
+
+  Client applications must add `_mr_timestamp` field for all reduce target
+  resource types.
+
+- Added strict handler configuration validator. After upgrading you might get
+  verious `HandlerValidationError` exceptions. Simply read the explanation in
+  the error message and fix what is needed.
+
+- `qvarnmr.testing.utils.process` now has `raise_errors` keyword argument which
+  is `True` by default. Previously, `process` helper simply logged errors from
+  handlers, but did not propageted any errors. Now behaviour changed and by
+  default errors are propagated. When running tests usually you want to get all
+  the errors loudly.
+
 
 0.1.6 (2017-09-26)
 ------------------

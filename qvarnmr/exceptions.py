@@ -8,3 +8,7 @@ class HandlerVersionError(Exception):
 
 class BusyListenerError(Exception):
     pass
+
+
+class HandlerValidationError(Exception):
+    pass

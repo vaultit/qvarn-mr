@@ -1,3 +1,10 @@
+.. image:: https://git.vaultit.org/common/qvarn-mr/badges/master/build.svg
+   :target: https://git.vaultit.org/common/qvarn-mr/commits/master
+
+.. image:: https://git.vaultit.org/common/qvarn-mr/badges/master/coverage.svg
+   :target: https://git.vaultit.org/common/qvarn-mr/commits/master
+
+
 Experimental Qvarn map/reduce service
 #####################################
 
@@ -220,6 +227,41 @@ That's it.
 How to define map/reduce handlers
 =================================
 
+Map/reduce handlers are defined in structure like this:
+
+.. code-block:: python
+
+    handlers = {
+        'map-target': {
+            'source-resource-type': {
+                'type': 'map',
+                'version': 1,
+                'handler': a_maper_function,
+            },
+        },
+        'reduce-target': {
+            'map-target': {
+                'type': 'reduce',
+                'version': 1,
+                'handler': a_maper_function,
+            },
+        },
+    }
+
+Here ``map-target`` and ``reduce-target`` are resource types, where derived
+data from ``source-resource-type`` are stored. Client applications should not
+write to derived resource types, because it might interfere with the qvarn-mr
+engine. qvarn-mr expects that client applications only reads from derived
+resources and only qvarn-mr takes care of populating data to the derived
+resources.
+
+There are some rules:
+
+- You can have multiple sources for map targets.
+
+- Reduce target can have only one source and that source must be a map target.
+
+
 Let's analyse the following example a bit further:
 
 .. code-block:: python
@@ -422,8 +464,9 @@ Purpose of these fields:
 - ``_mr_source_type`` - source resource type, this is needed to track resource
   updates and deletes.
 
-- ``_mr_version`` - handler version used to produce data for this resource.
-  Version is used to do automatic updates if handler version has changed.
+- ``_mr_version`` - version number tells version of handler, that was used to
+  created this derived resource. When you change handler version, all outdated
+  resources are automatically updated.
 
 - ``_mr_deleted`` - used for internal purposes, to track which resources have
   to be deleted, once whole update cycle is done. Resources are not deleted
@@ -444,6 +487,7 @@ For reduce target resource type, these fields are required:
         _mr_key: ''
         _mr_value: ''
         _mr_version: 0
+        _mr_timestamp: 0
       version: v1
 
 Purpose of these fields:
@@ -456,6 +500,17 @@ Purpose of these fields:
 
 - ``_mr_value`` - purpose of this field is exactly the same as for map derived
   resources.
+
+- ``_mr_version`` - purpose of this field is same as for map derived resources,
+  but in addition, version for reduce derived resources is used to make sure,
+  that reduce handler is only colled, when all source resource versions for a
+  key in question has the same value. If all source resources of a single key
+  has the same value, then it means, that update after version change was
+  completed and all sources resources where produced by the same handler
+  version.
+
+- ``_mr_timestamp`` - nonoseconds (10^-9 seconds) since unix epoch, used to
+  decide which resource is the newest.
 
 
 Helper functions

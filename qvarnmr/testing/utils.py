@@ -4,7 +4,7 @@ from qvarnmr.processor import get_changes, MapReduceEngine
 
 
 def cleaned(resource):
-    return {k: v for k, v in resource.items() if k not in ('id', 'revision')}
+    return {k: v for k, v in resource.items() if k not in ('id', 'revision', '_mr_timestamp')}
 
 
 def get_mapped_data(qvarn, target, expect_n_resources=None):
@@ -78,11 +78,11 @@ def update_resource(qvarn, _resource_type, *args, **kwargs):
     return updater
 
 
-def process(qvarn, listeners, config_or_engine, limit=10):
+def process(qvarn, listeners, config_or_engine, limit=10, raise_errors=True):
     if isinstance(config_or_engine, MapReduceEngine):
         engine = config_or_engine
     else:
-        engine = MapReduceEngine(qvarn, config_or_engine)
+        engine = MapReduceEngine(qvarn, config_or_engine, raise_errors=raise_errors)
     counter = count()
     changes_processed = 1
     while changes_processed > 0:

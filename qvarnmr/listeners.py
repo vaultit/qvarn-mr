@@ -7,6 +7,7 @@ from collections import namedtuple
 
 from qvarnmr.constants import DATETIME_FORMAT
 from qvarnmr.exceptions import BusyListenerError
+from qvarnmr.validation import validate_handlers
 
 logger = logging.getLogger(__name__)
 
@@ -14,8 +15,9 @@ Listener = namedtuple('Listener', ('source_resource_type', 'listener', 'state'))
 
 
 def get_or_create_listeners(qvarn, instance: str, config: dict):
-    listeners = []
+    validate_handlers(config)
 
+    listeners = []
     sources = set()
     for target_resource_type, handlers in config.items():
         for source_resource_type, handler in handlers.items():

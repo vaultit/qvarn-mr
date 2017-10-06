@@ -4,14 +4,31 @@
 # TARGET_SUITE
 # DPUT_REPOSITORY_NAME
 
+
+stages:
+  - tests
+  - build
+  - deploy
+
+tests:
+  # See https://git.vaultit.org/Foretagsdeklaration/docker-build-images
+  image: registry.vaultit.org/foretagsdeklaration/bolagsfakta-debian-image
+  stage: tests
+  cache:
+    key: "qvarnmr"
+    paths:
+      - .pip-cache
+  variables:
+    PIP_CACHE_DIR: .pip-cache/
+  script:
+    - make test
+
 debian_package:
   stage: build
   image: $PACKAGE_BUILD_IMAGE
   script:
     - ./build-debian-package $TARGET_SUITE 1
     - mv ../*.build ../*.changes ../*.dsc ../*.tar.* ../*.deb ./
-  tags:
-    - packaging
   artifacts:
     paths:
       - "*.build"
@@ -28,8 +45,6 @@ upload_package:
   script:
     - debsign -k$GPGKEYID *.changes
     - dput $DPUT_REPOSITORY_NAME *.changes
-  tags:
-    - packaging
   only:
     - master
   artifacts:

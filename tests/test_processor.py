@@ -56,6 +56,7 @@ SCHEMA = {
                     '_mr_key': '',
                     '_mr_value': 0,
                     '_mr_version': 0,
+                    '_mr_timestamp': 0,
                 },
             },
         ],
@@ -63,8 +64,8 @@ SCHEMA = {
 }
 
 
-def test_process_map_resync_samever(pretender, qvarn):
-    pretender.add_resource_types(SCHEMA)
+def test_process_map_resync_samever(realqvarn, qvarn):
+    realqvarn.add_resource_types(SCHEMA)
 
     config = {
         'map_target': {
@@ -104,8 +105,8 @@ def test_process_map_resync_samever(pretender, qvarn):
     }
 
 
-def test_delete_reduce_key_if_source_is_empty(pretender, qvarn):
-    pretender.add_resource_types(SCHEMA)
+def test_delete_reduce_key_if_source_is_empty(realqvarn, qvarn):
+    realqvarn.add_resource_types(SCHEMA)
 
     def reduce_handler(resources):
         resources = qvarn.get_multiple('map_target', resources)
@@ -156,8 +157,8 @@ def test_delete_reduce_key_if_source_is_empty(pretender, qvarn):
     assert get_resource_values(qvarn, 'reduce_target', '_mr_value') == []
 
 
-def test_reduce_half_synced_key(pretender, qvarn):
-    pretender.add_resource_types(SCHEMA)
+def test_reduce_half_synced_key(realqvarn, qvarn):
+    realqvarn.add_resource_types(SCHEMA)
 
     config = {
         'map_target': {
@@ -231,8 +232,8 @@ def test_reduce_half_synced_key(pretender, qvarn):
     ]
 
 
-def test_callbacks(pretender, qvarn, mocker, freezetime):
-    pretender.add_resource_types(SCHEMA)
+def test_callbacks(realqvarn, qvarn, mocker, freezetime):
+    realqvarn.add_resource_types(SCHEMA)
 
     mocker.patch('socket.gethostname', return_value='hostname')
     mocker.patch('os.getpid', return_value=1)
@@ -268,4 +269,38 @@ def test_callbacks(pretender, qvarn, mocker, freezetime):
     ]
     assert get_resource_values(qvarn, 'qvarnmr_listeners', ('owner', 'timestamp')) == [
         ('hostname/1', '2017-07-12T00:00:00.000000'),
+    ]
+
+
+def test_reduce_multiple_resources_for_signle_key(realqvarn, qvarn, mocker, freezetime):
+    realqvarn.add_resource_types(SCHEMA)
+
+    config = {
+        'map_target': {
+            'source': {
+                'type': 'map',
+                'version': 1,
+                'handler': item('key'),
+            },
+        },
+        'reduce_target': {
+            'map_target': {
+                'type': 'reduce',
+                'version': 1,
+                'handler': lambda x: len(list(x)),
+            },
+        },
+    }
+
+    engine = MapReduceEngine(qvarn, config, raise_errors=True)
+    listeners = get_or_create_listeners(qvarn, 'test', config)
+
+    qvarn.create('source', {'key': 'k1', 'value': 2}),
+    qvarn.create('reduce_target', {'_mr_key': 'k1'}),
+    qvarn.create('reduce_target', {'_mr_key': 'k1'}),
+
+    process(qvarn, listeners, engine)
+
+    assert get_resource_values(qvarn, 'reduce_target', ('_mr_key', '_mr_value')) == [
+        ('k1', 1),
     ]
