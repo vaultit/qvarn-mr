@@ -5,21 +5,38 @@ Change History
 ------------------
 
 - Added proper handler of duplicates for reduced resources, where single key
-  could have more than one resource. Now newsest resource is used and all other
-  duplicatesa re automatically removed.
+  could have more than one resource. Now newest resource is used and all other
+  duplicates re automatically removed.
 
   Client applications must add `_mr_timestamp` field for all reduce target
   resource types.
 
 - Added strict handler configuration validator. After upgrading you might get
-  verious `HandlerValidationError` exceptions. Simply read the explanation in
+  various `HandlerValidationError` exceptions. Simply read the explanation in
   the error message and fix what is needed.
 
 - `qvarnmr.testing.utils.process` now has `raise_errors` keyword argument which
   is `True` by default. Previously, `process` helper simply logged errors from
-  handlers, but did not propageted any errors. Now behaviour changed and by
+  handlers, but did not propagated any errors. Now behaviour changed and by
   default errors are propagated. When running tests usually you want to get all
   the errors loudly.
+
+- Added retries if client app handler fails with error. Retries are tracked per
+  notification. Single notification can be handled by multiple handers, but if
+  at least one handler fails, all handlers will be retries even those, who
+  completed successfully.
+
+  When an exception comes from handler, then notification is left undeleted and
+  information about error is stored in memory. Then first retry will be
+  attempted after 0.25 seconds, second after 1.5 second and finally
+  notification will be deleted and no more retires will be attempted.
+
+  If `qvarnmr-worker` will be terminated, then all notifications will be
+  retries, but retries can happen more than 2 times, because information about
+  previous retries where stored in RAM memory.
+
+  This mechanism is temporary, until parallel handler processing will be
+  implemented.
 
 
 0.1.6 (2017-09-26)

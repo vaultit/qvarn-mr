@@ -1,4 +1,4 @@
-from types import GeneratorType
+from collections.abc import Iterator
 from functools import wraps
 
 
@@ -37,7 +37,7 @@ def run(func, context, value):
     else:
         result = func(value)
 
-    if isinstance(result, GeneratorType):
+    if isinstance(result, Iterator):
         yield from result
     else:
         yield result
