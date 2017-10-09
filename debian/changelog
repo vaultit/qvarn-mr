@@ -1,3 +1,9 @@
+qvarn-mr (1.1.7-1) jessie; urgency=medium
+
+    * New upstream release.
+
+ -- POV Team <tilaajavastuu@pov.lt>  Thu, 9 Oct 2017 14:43:38 +0300
+
 qvarn-mr (1.1.6-1) jessie; urgency=medium
 
     * New upstream release.

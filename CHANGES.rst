@@ -1,7 +1,11 @@
 Change History
 ==============
 
-0.1.7 (unreleased)
+0.1.8 (unreleased)
+------------------
+
+
+0.1.7 (2017-10-09)
 ------------------
 
 - Added proper handler of duplicates for reduced resources, where single key

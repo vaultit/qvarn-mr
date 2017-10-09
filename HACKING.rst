@@ -10,9 +10,11 @@ PEP-8 and `NumPy Style docstrings`_.
 How to release new version
 ==========================
 
-- Update version number in setup.py.
+- Update version number in ``setup.py`` and ``debian/changelog``.
 
-- Run ``python setup.py sdist``.
+- Run ``make sdist``.
+
+- Commit changes with message "New qvarn-mr release (0.1.2)".
 
 - Add git tag::
 

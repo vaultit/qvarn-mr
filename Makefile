@@ -8,6 +8,7 @@ help:
 	@echo ""
 	@echo "make                      # build everything (for dev environment)"
 	@echo "make test                 # run tests"
+	@echo "make sdist                # create python source package"
 	@echo "make requirements         # update requirements*.txt from requirements/*.in"
 	@echo "make update-requirements  # upgrade and requirements*.txt from requirements/*.in"
 
@@ -15,6 +16,11 @@ help:
 .PHONY: test
 test: env
 	env/bin/py.test --cov-report=term-missing --cov=qvarnmr tests
+
+
+.PHONY: sdist
+sdist: env
+	env/bin/python setup.py sdist
 
 
 .PHONY: requirements
