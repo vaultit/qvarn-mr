@@ -419,7 +419,8 @@ class MapReduceEngine:
 
 
 def get_changes(qvarn, listeners):
-    for resource_type, listener, state in listeners:
+    l = list(listeners)  # create a new copy of listeners
+    for resource_type, listener, state in l:
         path = resource_type + '/listeners/' + listener['id'] + '/notifications'
         for notification_id in qvarn.get_list(path):
             try:
