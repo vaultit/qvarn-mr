@@ -1,8 +1,16 @@
 Change History
 ==============
 
-0.1.8 (unreleased)
+0.1.9 (unreleased)
 ------------------
+
+
+0.1.8 (2018-01-25)
+------------------
+
+- Handle errors while getting Notification from qvarn
+
+- Attempt to fix mystical listeners mutability bug.
 
 
 0.1.7 (2017-10-09)
