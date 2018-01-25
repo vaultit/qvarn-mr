@@ -5,10 +5,11 @@ from operator import itemgetter
 from itertools import groupby
 from collections import namedtuple
 
-from qvarnmr.func import run
-from qvarnmr.utils import is_empty
+from qvarnmr.clients.qvarn import QvarnResourceNotFound
 from qvarnmr.exceptions import HandlerVersionError
+from qvarnmr.func import run
 from qvarnmr.handlers import get_handlers
+from qvarnmr.utils import is_empty
 
 logger = logging.getLogger(__name__)
 
@@ -421,7 +422,12 @@ def get_changes(qvarn, listeners):
     for resource_type, listener, state in listeners:
         path = resource_type + '/listeners/' + listener['id'] + '/notifications'
         for notification_id in qvarn.get_list(path):
-            notification = qvarn.get(path, notification_id)
+            try:
+                notification = qvarn.get(path, notification_id)
+            except QvarnResourceNotFound:
+                logger.warning("master:   notification has been deleted (probably after giving up "
+                               "retries): notification=%s resource_type=%s", notification_id,
+                               resource_type)
             yield Notification(
                 resource_type=resource_type,
                 resource_change=notification['resource_change'],
