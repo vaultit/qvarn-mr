@@ -429,6 +429,8 @@ def get_changes(qvarn, listeners):
                 logger.warning("master:   notification has been deleted (probably after giving up "
                                "retries): notification=%s resource_type=%s", notification_id,
                                resource_type)
+                # continue loop withouth yielding
+                continue
             yield Notification(
                 resource_type=resource_type,
                 resource_change=notification['resource_change'],
