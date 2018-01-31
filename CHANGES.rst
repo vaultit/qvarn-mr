@@ -1,8 +1,14 @@
 Change History
 ==============
 
-0.1.9 (unreleased)
+0.1.10 (unreleased)
 ------------------
+
+
+0.1.9 (2018-01-31)
+------------------
+
+- Fix bug when code if executed further on, even though exception was logged
 
 
 0.1.8 (2018-01-25)

@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='qvarn-mr',
-    version='0.1.8',
+    version='0.1.9',
     license="LGPL",
     packages=find_packages('.'),
     include_package_data=True,
