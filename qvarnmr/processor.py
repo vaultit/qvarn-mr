@@ -307,6 +307,7 @@ class MapReduceEngine:
         changes_processed = 0
         errors = 0
         reduce_changes = []
+        progress = 0
 
         # Run through all changes, process map handlers immediately and collect changes that have
         # reduce handlers for processing in groups in the next step.
@@ -359,6 +360,10 @@ class MapReduceEngine:
                     changes_processed += 1
 
             self._run_callbacks('map_handler_processed')
+
+            progress += 1
+            if progress % 100 == 0:
+                logger.info('processed %d notifications', progress)
 
         return changes_processed, errors, reduce_changes
 
@@ -422,7 +427,10 @@ def get_changes(qvarn, listeners):
     l = list(listeners)  # create a new copy of listeners
     for resource_type, listener, state in l:
         path = resource_type + '/listeners/' + listener['id'] + '/notifications'
-        for notification_id in qvarn.get_list(path):
+        notifications = qvarn.get_list(path)
+        logger.info("there are %d pending notifications for source=%s",
+                    len(notifications), resource_type)
+        for notification_id in notifications:
             try:
                 notification = qvarn.get(path, notification_id)
             except QvarnResourceNotFound:
