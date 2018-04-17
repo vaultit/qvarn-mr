@@ -312,9 +312,12 @@ class MapReduceEngine:
         # reduce handlers for processing in groups in the next step.
         for notification in changes:
             try:
-                _process_map(self.qvarn, notification.resource_type, notification.resource_change,
-                             notification.resource_id, self.mappers[notification.resource_type],
-                             resync)
+                handlers = self.mappers[notification.resource_type]
+                if handlers:
+                    _process_map(
+                        self.qvarn, notification.resource_type, notification.resource_change,
+                        notification.resource_id, handlers, resync,
+                    )
 
             except Exception:
                 # XXX: probably errors should be handler inside _process_map and another
