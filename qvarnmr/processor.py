@@ -348,7 +348,7 @@ class MapReduceEngine:
                                                      show=('_mr_key',), default=None)
                     if resource is None:
                         logger.warning(
-                            "can't find resource (%s, %s) specifiend in notificaton, the resource "
+                            "can't find resource (%s, %s) specified in notificaton, the resource "
                             "could be deleted or not yet replicated", notification.resource_type,
                             notification.resource_id)
                         self._report_error([notification])
