@@ -379,7 +379,8 @@ class MapReduceEngine:
         grouped = list(groupby(changes, key=itemgetter(0)))
         if grouped:
             logger.info("grouped %d changes into %d groups", len(changes), len(grouped))
-        for (source_resource_type, key), group in grouped:
+        # XXX: if I loop over `grouped` here the tests fail.  why???
+        for (source_resource_type, key), group in groupby(changes, key=itemgetter(0)):
             try:
                 _process_reduce(self.qvarn, self.config, source_resource_type, key,
                                 self.reducers[source_resource_type], resync=resync)
