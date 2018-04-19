@@ -1,8 +1,17 @@
 Change History
 ==============
 
-0.1.10 (unreleased)
-------------------
+0.1.10 (2018-04-19)
+-------------------
+
+- Log the number of notifications that require handling, and log progress
+  messages after handling each batch of 100.
+
+- Avoid loading resources from Qvarn when there are no registered handlers
+  to use on those resources.
+
+- Fix typo in log message ("can't find resource ... specifiend in notification"
+  -> "... specified ...").
 
 
 0.1.9 (2018-01-31)
@@ -207,4 +216,4 @@ Change History
 0.1.0 (2017-05-17)
 ------------------
 
-- Initial version, tested with Qvarn 0.80.
+- Initial version, tested with Qvarn 0.80
