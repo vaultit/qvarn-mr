@@ -414,7 +414,7 @@ class MapReduceEngine:
 
             progress += 1
             if progress % 100 == 0:
-                logger.info('processed %d reduce handlers', progress)
+                logger.info('processed %d/%d reduce handlers', progress, len(grouped))
 
             self._run_callbacks('reduce_handler_processed')
 
