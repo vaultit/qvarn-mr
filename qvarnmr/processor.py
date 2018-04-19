@@ -376,7 +376,7 @@ class MapReduceEngine:
 
         # Process all changes with reduce handlers in groups.
         changes = sorted(changes, key=itemgetter(0))
-        grouped = list(groupby(changes, key=itemgetter(0)))
+        grouped = [(key, list(group)) for key, group in groupby(changes, key=itemgetter(0))]
         if grouped:
             logger.info("grouped %d changes into %d groups", len(changes), len(grouped))
         for (source_resource_type, key), group in grouped:
