@@ -372,10 +372,14 @@ class MapReduceEngine:
 
     def process_reduce_handlers(self, changes, *, errors=0, resync=False):
         changes_processed = 0
+        progress = 0
 
         # Process all changes with reduce handlers in groups.
         changes = sorted(changes, key=itemgetter(0))
-        for (source_resource_type, key), group in groupby(changes, key=itemgetter(0)):
+        grouped = [(key, list(group)) for key, group in groupby(changes, key=itemgetter(0))]
+        if grouped:
+            logger.info("grouped %d changes into %d groups", len(changes), len(grouped))
+        for (source_resource_type, key), group in grouped:
             try:
                 _process_reduce(self.qvarn, self.config, source_resource_type, key,
                                 self.reducers[source_resource_type], resync=resync)
@@ -408,6 +412,10 @@ class MapReduceEngine:
                 self._report_success(notifications)
                 changes_processed += len(notifications)
 
+            progress += 1
+            if progress % 100 == 0:
+                logger.info('processed %d/%d reduce handlers', progress, len(grouped))
+
             self._run_callbacks('reduce_handler_processed')
 
         return changes_processed, errors
@@ -431,8 +439,9 @@ def get_changes(qvarn, listeners):
     for resource_type, listener, state in l:
         path = resource_type + '/listeners/' + listener['id'] + '/notifications'
         notifications = qvarn.get_list(path)
-        logger.info("there are %d pending notifications for source=%s",
-                    len(notifications), resource_type)
+        if notifications:
+            logger.info("there are %d pending notifications for source=%s",
+                        len(notifications), resource_type)
         for notification_id in notifications:
             try:
                 notification = qvarn.get(path, notification_id)
