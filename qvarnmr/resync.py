@@ -24,21 +24,29 @@ def iter_map_resync_changes(qvarn: QvarnApi, source_resource_type: str):
         )
 
 
-def iter_reduce_resync_keys(qvarn: QvarnApi, source_resource_type: str):
+def iter_reduce_resync_keys(qvarn: QvarnApi, source_resource_type: str, batch_size=1000):
     reduced_keys = set()
-    for resource in qvarn.search(source_resource_type, show=('_mr_key',)):
-        key = resource['_mr_key']
-        if key not in reduced_keys:
-            notification = Notification(
-                resource_type=source_resource_type,
-                resource_change=UPDATED,
-                resource_id=None,
-                notification_id=None,
-                listener_id=None,
-                generated=True,
-            )
-            yield (source_resource_type, key), notification
-            reduced_keys.add(key)
+    # qvarn.search(source_resource_type, show=('_mr_key',)) should in theory be
+    # faster (it asks for less data), but unfortunately Qvarn takes so long
+    # to process it for larger tables (on the order of 20 thousand rows) that
+    # HAProxy times out and we get a failure, making it impossible to resync
+    # QvarnMR data altogether.
+    resource_ids = qvarn.get_list(source_resource_type)
+    for batch in range(0, len(resource_ids), batch_size):
+        for resource in qvarn.get_multiple(source_resource_type,
+                                           resource_ids[batch:batch+batch_size]):
+            key = resource['_mr_key']
+            if key not in reduced_keys:
+                notification = Notification(
+                    resource_type=source_resource_type,
+                    resource_change=UPDATED,
+                    resource_id=None,
+                    notification_id=None,
+                    listener_id=None,
+                    generated=True,
+                )
+                yield (source_resource_type, key), notification
+                reduced_keys.add(key)
 
 
 def update_handler_version(qvarn, instance, target_resource_type, source_resource_type, version):
