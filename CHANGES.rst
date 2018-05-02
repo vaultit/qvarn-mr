@@ -1,10 +1,11 @@
 Change History
 ==============
 
-0.1.11 (unreleased)
+0.1.11 (2018-05-02)
 -------------------
 
-- Nothing changed yet.
+- Avoid slow qvarn.search(..., show=("_mr_key",)) queries in resync that would
+  time out and break resyncing for any larger resource tables.
 
 
 0.1.10 (2018-04-19)
